@@ -11,6 +11,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 
+const LOGIN_BACKGROUND_URL = '/login-background.jpg'
+
 export function LoginPage() {
   const { isAuthenticated, isLoading, loginWith42 } = useAuth()
   const [searchParams] = useSearchParams()
@@ -33,26 +35,19 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4 py-10">
-      {/* Atmosphere — logo navy + electric blue */}
+    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,oklch(0.55_0.14_241_/_0.18),transparent)] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,oklch(0.45_0.14_241_/_0.35),transparent)]"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url("${LOGIN_BACKGROUND_URL}")` }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,oklch(0.45_0.08_258_/_0.12),transparent_50%)] dark:bg-[radial-gradient(circle_at_80%_80%,oklch(0.30_0.08_258_/_0.35),transparent_50%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.035]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        }}
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/35 via-slate-950/50 to-slate-950/80"
       />
 
       <div className="absolute top-4 right-4 z-20 sm:top-6 sm:right-6">
-        <ThemeToggle />
+        <ThemeToggle className="bg-black/25 text-white backdrop-blur-sm hover:bg-black/40 hover:text-white" />
       </div>
 
       <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8">
@@ -63,17 +58,17 @@ export function LoginPage() {
             className="size-20 rounded-2xl object-contain shadow-lg shadow-primary/25"
           />
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
               1337 Pool Predict
             </h1>
-            <p className="max-w-xs text-sm text-muted-foreground leading-relaxed">
+            <p className="max-w-xs text-sm leading-relaxed text-white/80 drop-shadow-sm">
               Predict Piscine Exam 00–03 outcomes. Only active 42-core students
               from 1337 MED Tetouan can join.
             </p>
           </div>
         </div>
 
-        <Card className="w-full shadow-xl shadow-black/5">
+        <Card className="w-full bg-card/95 shadow-2xl shadow-black/30 backdrop-blur-md">
           <CardHeader className="text-center">
             <CardTitle className="text-base">Welcome back</CardTitle>
             <CardDescription>
@@ -99,7 +94,7 @@ export function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-xs text-white/70 drop-shadow-sm">
           Current poolers cannot access the platform.
         </p>
       </div>
