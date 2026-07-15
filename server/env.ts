@@ -1,6 +1,20 @@
 import { z } from 'zod'
 
-const appOrigin = process.env.APP_ORIGIN ?? 'http://localhost:5173'
+export function resolveAppOrigin(
+  explicitOrigin: string | undefined,
+  productionHost: string | undefined,
+  deploymentHost: string | undefined
+) {
+  if (explicitOrigin) return new URL(explicitOrigin).origin
+  const vercelHost = productionHost ?? deploymentHost
+  return vercelHost ? `https://${vercelHost}` : 'http://localhost:5173'
+}
+
+const appOrigin = resolveAppOrigin(
+  process.env.APP_ORIGIN,
+  process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  process.env.VERCEL_URL
+)
 
 export function resolveRedirectUri(value: string | undefined, origin = appOrigin) {
   const localCallback = new URL('/api/auth/42/callback', origin).toString()

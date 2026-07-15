@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { resolveRedirectUri } from './env.ts'
+import { resolveAppOrigin, resolveRedirectUri } from './env.ts'
+
+describe('application origin configuration', () => {
+  it('uses the Vercel production host when APP_ORIGIN is absent', () => {
+    expect(
+      resolveAppOrigin(undefined, 'pool-predict.vercel.app', 'preview.vercel.app')
+    ).toBe('https://pool-predict.vercel.app')
+  })
+
+  it('keeps an explicit origin as the highest priority', () => {
+    expect(
+      resolveAppOrigin(
+        'https://predictions.example.com/path',
+        'pool-predict.vercel.app',
+        undefined
+      )
+    ).toBe('https://predictions.example.com')
+  })
+})
 
 describe('42 redirect URI configuration', () => {
   it('uses the app callback when no URI is configured', () => {

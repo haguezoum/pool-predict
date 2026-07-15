@@ -59,6 +59,8 @@ CRON_SECRET
 
 `FORTY_TWO_TETOUAN_CAMPUS_ID` is optional. When omitted, the API discovers the campus by the `1337 MED` / `Tetouan` campus data returned by 42.
 
+`APP_ORIGIN` is optional on Vercel because the API derives it from `VERCEL_PROJECT_PRODUCTION_URL`. All secrets must still be configured in the Vercel project; local `.env` files are never uploaded by Git deployments.
+
 The PostgreSQL client disables prepared statements and makes every runtime connection assume the restricted `pool_predict_api` role. `DIRECT_DATABASE_URL` is read by migration tooling only.
 
 ## Commands
