@@ -2,6 +2,13 @@
   "name": "pool-predict",
   "private": true,
   "version": "0.0.0",
+  "keywords":[
+    "1337",
+    "42",
+    "pool",
+    "piscine",
+    "42 Network"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
