@@ -17,6 +17,10 @@ describe('application origin configuration', () => {
       )
     ).toBe('https://predictions.example.com')
   })
+
+  it('defers malformed origins to schema validation without crashing imports', () => {
+    expect(resolveAppOrigin('not a URL', undefined, undefined)).toBe('not a URL')
+  })
 })
 
 describe('42 redirect URI configuration', () => {
@@ -42,5 +46,11 @@ describe('42 redirect URI configuration', () => {
         'https://pool-predict.vercel.app'
       )
     ).toBe('https://pool-predict.vercel.app/api/auth/42/callback')
+  })
+
+  it('defers malformed callbacks to schema validation without crashing imports', () => {
+    expect(resolveRedirectUri('not a URL', 'https://pool-predict.vercel.app')).toBe(
+      'not a URL'
+    )
   })
 })

@@ -5,7 +5,13 @@ export function resolveAppOrigin(
   productionHost: string | undefined,
   deploymentHost: string | undefined
 ) {
-  if (explicitOrigin) return new URL(explicitOrigin).origin
+  if (explicitOrigin) {
+    try {
+      return new URL(explicitOrigin).origin
+    } catch {
+      return explicitOrigin
+    }
+  }
   const vercelHost = productionHost ?? deploymentHost
   return vercelHost ? `https://${vercelHost}` : 'http://localhost:5173'
 }
@@ -20,7 +26,12 @@ export function resolveRedirectUri(value: string | undefined, origin = appOrigin
   const localCallback = new URL('/api/auth/42/callback', origin).toString()
   if (!value) return localCallback
 
-  const configured = new URL(value)
+  let configured: URL
+  try {
+    configured = new URL(value)
+  } catch {
+    return value
+  }
   const isAuthorizeUrl =
     configured.origin === 'https://api.intra.42.fr' &&
     configured.pathname === '/oauth/authorize'
