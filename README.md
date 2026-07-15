@@ -60,7 +60,7 @@ SESSION_SECRET
 CRON_SECRET
 ```
 
-`FORTY_TWO_TETOUAN_CAMPUS_ID` is optional. When omitted, the API discovers the campus by the `1337 MED` / `Tetouan` campus data returned by 42.
+`FORTY_TWO_TETOUAN_CAMPUS_ID` defaults to the verified 1337 MED/Tetouan campus ID `55`. It can be overridden if 42 changes that reference.
 
 Access policy values are server-only and comma-separated where applicable:
 

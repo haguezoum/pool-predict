@@ -83,7 +83,7 @@ const raw = {
   redirectUri: resolveRedirectUri(
     process.env.FORTY_TWO_REDIRECT_URI ?? process.env.REDIRECT_URI
   ),
-  campusId: process.env.FORTY_TWO_TETOUAN_CAMPUS_ID,
+  campusId: process.env.FORTY_TWO_TETOUAN_CAMPUS_ID ?? '55',
   allowedKinds: process.env.FORTY_TWO_ALLOWED_KINDS ?? DEFAULT_ALLOWED_KINDS,
   allowedCampusIds: process.env.FORTY_TWO_ALLOWED_CAMPUS_IDS ?? '',
   allowPoolers: process.env.FORTY_TWO_ALLOW_POOLERS ?? 'no',

@@ -5,6 +5,8 @@ const API_ORIGIN = 'https://api.intra.42.fr'
 const PAGE_SIZE = 100
 const PISCINE_DURATION_MS = 28 * 24 * 60 * 60 * 1000
 const EXAM_DURATION_MS = 4 * 60 * 60 * 1000
+const REQUEST_TIMEOUT_MS = 12_000
+const POOL_DISCOVERY_TIMEOUT_MS = 30_000
 
 type ImageShape = {
   link?: string | null
@@ -112,6 +114,17 @@ export class FortyTwoUnavailableError extends Error {
     this.name = 'FortyTwoUnavailableError'
     this.status = status
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new FortyTwoUnavailableError(message)),
+      timeoutMs
+    )
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
 function displayName(user: FortyTwoUser | LivePooler) {
@@ -264,6 +277,7 @@ export function isEligibleUser(
 export class FortyTwoClient {
   private appToken: { value: string; expiresAt: number } | null = null
   private poolCache: { value: LivePoolSnapshot; expiresAt: number } | null = null
+  private poolDiscovery: Promise<LivePoolSnapshot> | null = null
   private readonly env: Env
 
   constructor(env: Env = getEnv()) {
@@ -271,12 +285,17 @@ export class FortyTwoClient {
   }
 
   private async token(params: URLSearchParams) {
-    const response = await fetch(`${API_ORIGIN}/oauth/token`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: params,
-      signal: AbortSignal.timeout(15_000),
-    })
+    let response: Response
+    try {
+      response = await fetch(`${API_ORIGIN}/oauth/token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: params,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    } catch {
+      throw new FortyTwoUnavailableError('42 token request timed out')
+    }
     if (!response.ok) {
       throw new FortyTwoUnavailableError('42 token exchange failed', response.status)
     }
@@ -318,12 +337,18 @@ export class FortyTwoClient {
 
   private async request<T>(path: string, accessToken?: string, attempt = 0): Promise<T> {
     const token = accessToken ?? (await this.getAppToken())
-    const response = await fetch(`${API_ORIGIN}${path}`, {
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(20_000),
-    })
+    let response: Response
+    try {
+      response = await fetch(`${API_ORIGIN}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    } catch {
+      throw new FortyTwoUnavailableError(`42 request timed out: ${path}`)
+    }
     if (response.status === 429 && attempt < 3) {
-      const retryAfter = Number(response.headers.get('retry-after'))
+      const retryAfterHeader = response.headers.get('retry-after')
+      const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : Number.NaN
       const delay = Number.isFinite(retryAfter)
         ? Math.min(5_000, Math.max(500, retryAfter * 1_000))
         : Math.min(5_000, 1_000 * (attempt + 1))
@@ -394,8 +419,30 @@ export class FortyTwoClient {
     if (this.poolCache && this.poolCache.expiresAt > Date.now()) {
       return this.poolCache.value
     }
+    if (!this.poolDiscovery) {
+      const discovery = this.discoverCurrentPool()
+      this.poolDiscovery = discovery
+      void discovery
+        .finally(() => {
+          if (this.poolDiscovery === discovery) this.poolDiscovery = null
+        })
+        .catch(() => undefined)
+    }
+    return withTimeout(
+      this.poolDiscovery,
+      POOL_DISCOVERY_TIMEOUT_MS,
+      '42 pool discovery timed out'
+    )
+  }
+
+  private async discoverCurrentPool(): Promise<LivePoolSnapshot> {
     const now = new Date()
-    const campuses = await this.paginate<Campus>('/v2/campus')
+    const [campuses, cursus] = await Promise.all([
+      this.env.campusId
+        ? Promise.resolve<Campus[]>([])
+        : this.paginate<Campus>('/v2/campus'),
+      this.paginate<Cursus>('/v2/cursus'),
+    ])
     const campusId =
       this.env.campusId ??
       campuses.find((campus) => {
@@ -404,7 +451,6 @@ export class FortyTwoClient {
       })?.id
     if (!campusId) throw new FortyTwoUnavailableError('Tetouan campus was not found')
 
-    const cursus = await this.paginate<Cursus>('/v2/cursus')
     const piscine = cursus.find((item) => {
       const slug = item.slug?.toLowerCase()
       const name = item.name?.toLowerCase()
@@ -422,12 +468,21 @@ export class FortyTwoClient {
     const cohort = selectActiveCohort(cursusUsers, now)
     if (!cohort) throw new FortyTwoUnavailableError('No active Tetouan Piscine C cohort was found')
 
-    let detailedUsers: FortyTwoUser[]
-    try {
-      detailedUsers = await this.getUsers(cohort.users.map((row) => row.user.id))
-    } catch {
-      detailedUsers = []
-    }
+    const examRange = [
+      new Date(cohort.startsAt.getTime() - 24 * 60 * 60 * 1_000).toISOString(),
+      new Date(cohort.endsAt.getTime() + 24 * 60 * 60 * 1_000).toISOString(),
+    ].join(',')
+    const [detailedUsers, officialExams, projects] = await Promise.all([
+      this.getUsers(cohort.users.map((row) => row.user.id)).catch(() => []),
+      this.paginate<FortyTwoExam>(
+        `/v2/campus/${campusId}/cursus/${piscine.id}/exams?sort=begin_at&range%5Bbegin_at%5D=${encodeURIComponent(examRange)}`
+      )
+        .then((rows) => [...new Map(rows.map((exam) => [exam.id, exam])).values()])
+        .catch(() => []),
+      this.paginate<FortyTwoProject>(
+        `/v2/cursus/${piscine.id}/projects?sort=-id`
+      ).catch(() => []),
+    ])
     const detailById = new Map(detailedUsers.map((user) => [user.id, user]))
     const poolers = cohort.users.map((row) => {
       const detail = detailById.get(row.user.id)
@@ -438,28 +493,6 @@ export class FortyTwoClient {
         avatarUrl: detail ? avatarUrl(detail) : '',
       }
     })
-
-    let officialExams: FortyTwoExam[] = []
-    let projects: FortyTwoProject[] = []
-    const examRange = [
-      new Date(cohort.startsAt.getTime() - 24 * 60 * 60 * 1_000).toISOString(),
-      new Date(cohort.endsAt.getTime() + 24 * 60 * 60 * 1_000).toISOString(),
-    ].join(',')
-    try {
-      const rows = await this.paginate<FortyTwoExam>(
-        `/v2/campus/${campusId}/cursus/${piscine.id}/exams?sort=begin_at&range%5Bbegin_at%5D=${encodeURIComponent(examRange)}`
-      )
-      officialExams = [...new Map(rows.map((exam) => [exam.id, exam])).values()]
-    } catch {
-      officialExams = []
-    }
-    try {
-      projects = await this.paginate<FortyTwoProject>(
-        `/v2/cursus/${piscine.id}/projects?sort=-id`
-      )
-    } catch {
-      projects = []
-    }
 
     const fallback = fallbackExamDates(cohort.startsAt)
     const exams = EXAM_CODES.map((code, index) => {

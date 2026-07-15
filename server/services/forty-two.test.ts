@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  FortyTwoClient,
   isEligibleUser,
   selectActiveCohort,
   type FortyTwoUser,
 } from './forty-two.js'
-import type { UserKind } from '../env.js'
+import type { Env, UserKind } from '../env.js'
 
 function user(overrides: Partial<FortyTwoUser> = {}): FortyTwoUser {
   return {
@@ -31,6 +32,10 @@ function policy(overrides: {
     allowPoolers: overrides.allowPoolers ?? false,
   }
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('42 eligibility', () => {
   it('allows an active Tetouan core student', () => {
@@ -121,5 +126,69 @@ describe('Piscine cohort selection', () => {
     const rows = [cohortUser(1, '2025-01-06T08:30:00.000Z')]
 
     expect(selectActiveCohort(rows, new Date('2026-07-15T12:00:00.000Z'))).toBeUndefined()
+  })
+})
+
+describe('42 pool discovery', () => {
+  it('coalesces concurrent discovery requests into one 42 request graph', async () => {
+    const beginAt = new Date().toISOString()
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/oauth/token') {
+        return Response.json({ access_token: 'app-token', expires_in: 7_200 })
+      }
+      if (url.pathname === '/v2/cursus/9/cursus_users') {
+        return Response.json([
+          {
+            id: 1,
+            begin_at: beginAt,
+            end_at: null,
+            user: { id: 42, login: 'pooler' },
+          },
+        ])
+      }
+      if (url.pathname === '/v2/cursus') {
+        return Response.json([{ id: 9, slug: 'c-piscine', name: 'C Piscine', kind: 'piscine' }])
+      }
+      if (url.pathname === '/v2/users') {
+        return Response.json([{ id: 42, login: 'pooler', kind: 'student' }])
+      }
+      if (url.pathname === '/v2/campus/55/cursus/9/exams') {
+        return Response.json([])
+      }
+      if (url.pathname === '/v2/cursus/9/projects') {
+        return Response.json([])
+      }
+      return new Response('Unexpected 42 request', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const env: Env = {
+      nodeEnv: 'test',
+      appOrigin: 'http://localhost:5173',
+      apiPort: 3001,
+      clientId: 'client',
+      clientSecret: 'secret',
+      redirectUri: 'http://localhost:5173/api/auth/42/callback',
+      campusId: 55,
+      allowedKinds: ['admin', 'student', 'external'],
+      allowedCampusIds: [],
+      allowPoolers: false,
+      databaseUrl: 'postgres://unused',
+      databaseRole: 'pool_predict_api',
+      sessionSecret: 'test-session-secret-long-enough',
+    }
+    const client = new FortyTwoClient(env)
+
+    const [first, second] = await Promise.all([
+      client.getCurrentPool(),
+      client.getCurrentPool(),
+    ])
+
+    expect(first).toBe(second)
+    expect(first.poolers).toHaveLength(1)
+    const rosterRequests = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/v2/cursus/9/cursus_users')
+    )
+    expect(rosterRequests).toHaveLength(1)
   })
 })
