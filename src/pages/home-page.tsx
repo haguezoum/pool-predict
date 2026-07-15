@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import {
   CheckIcon,
-  Clock3Icon,
   EyeIcon,
   Maximize2Icon,
   RefreshCwIcon,
@@ -19,7 +18,6 @@ import type { Match } from '@/types'
 import { FridayLineChart } from '@/components/friday-line-chart'
 import { PlayerDetailDialog } from '@/components/player-detail-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -34,27 +32,6 @@ function initials(name: string) {
     .join('')
     .slice(0, 2)
     .toUpperCase()
-}
-
-function useNow() {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
-    return () => window.clearInterval(timer)
-  }, [])
-  return now
-}
-
-function lockLabel(lockAt: string, now: number) {
-  const lockTime = new Date(lockAt).getTime()
-  if (now >= lockTime) return 'Locked'
-  const remaining = lockTime - now
-  const days = Math.floor(remaining / 86_400_000)
-  const hours = Math.floor((remaining % 86_400_000) / 3_600_000)
-  const minutes = Math.max(1, Math.floor((remaining % 3_600_000) / 60_000))
-  if (days > 0) return `Locks in ${days}d ${hours}h`
-  if (hours > 0) return `Locks in ${hours}h ${minutes}m`
-  return `Locks in ${minutes}m`
 }
 
 function RevealedPredictions({ exam, poolerIntraId }: { exam: ExamView; poolerIntraId: number }) {
@@ -264,7 +241,6 @@ export function HomePage() {
   const { user } = useAuth()
   const [query, setQuery] = useState('')
   const [selectedCode, setSelectedCode] = useState<ExamCode>('00')
-  const now = useNow()
 
   const poolQuery = useQuery({ queryKey: ['pool', 'current'], queryFn: api.currentPool })
   const pool = poolQuery.data
@@ -341,8 +317,6 @@ export function HomePage() {
     )
   }
 
-  const examBetCount = selectedExam ? betsByPooler.size : 0
-
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -370,12 +344,6 @@ export function HomePage() {
             {user?.totalScore.toLocaleString()}
           </span>
         </p>
-        <p className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">Current pool</span>
-          <span className="text-sm font-medium">
-            {new Date(pool.startsAt).toLocaleDateString()} – {new Date(pool.endsAt).toLocaleDateString()}
-          </span>
-        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -392,25 +360,6 @@ export function HomePage() {
             </Button>
           ))}
         </div>
-        {selectedExam ? (
-          <div
-            className={cn(
-              'flex flex-col gap-2 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
-              examBetCount === 0 && !selectedExam.locked && 'border-amber-500/40 bg-amber-500/5'
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Clock3Icon className="size-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{lockLabel(selectedExam.lockAt, now)}</span>
-              <span className="text-xs text-muted-foreground">
-                {new Date(selectedExam.lockAt).toLocaleString()}
-              </span>
-            </div>
-            <Badge variant={examBetCount > 0 ? 'default' : 'secondary'}>
-              {examBetCount} prediction{examBetCount === 1 ? '' : 's'}
-            </Badge>
-          </div>
-        ) : null}
       </section>
 
       {!pool.sourceAvailable ? (

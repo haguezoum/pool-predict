@@ -61,10 +61,6 @@ export function LoginPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
               1337 Pool Predict
             </h1>
-            <p className="max-w-xs text-sm leading-relaxed text-white/80 drop-shadow-sm">
-              Predict Piscine Exam 00–03 outcomes. Only active 42-core students
-              from 1337 MED Tetouan can join.
-            </p>
           </div>
         </div>
 
