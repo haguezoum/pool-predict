@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const USER_KINDS = ['student', 'alumni', 'staff'] as const
 export type UserKind = (typeof USER_KINDS)[number]
+const DEFAULT_ALLOWED_KINDS = USER_KINDS.join(',')
 
 const csvValues = z.string().transform((value) =>
   value
@@ -83,7 +84,7 @@ const raw = {
     process.env.FORTY_TWO_REDIRECT_URI ?? process.env.REDIRECT_URI
   ),
   campusId: process.env.FORTY_TWO_TETOUAN_CAMPUS_ID,
-  allowedKinds: process.env.FORTY_TWO_ALLOWED_KINDS ?? 'student',
+  allowedKinds: process.env.FORTY_TWO_ALLOWED_KINDS ?? DEFAULT_ALLOWED_KINDS,
   allowedCampusIds: process.env.FORTY_TWO_ALLOWED_CAMPUS_IDS ?? '',
   allowPoolers: process.env.FORTY_TWO_ALLOW_POOLERS ?? 'no',
   databaseUrl:

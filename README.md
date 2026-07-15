@@ -1,6 +1,6 @@
 # 1337 Tetouan Pool Predict
 
-Private Exam 00–03 prediction platform for the 1337 MED Tetouan Piscine. By default, only active 42-core students may sign in and current poolers are rejected; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
+Private Exam 00–03 prediction platform for the 1337 MED Tetouan Piscine. Student, alumni, and staff categories may sign in by default, while current poolers remain rejected unless explicitly enabled; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
 
 ## Rules
 
@@ -50,7 +50,7 @@ APP_ORIGIN
 FORTY_TWO_CLIENT_ID
 FORTY_TWO_CLIENT_SECRET
 FORTY_TWO_REDIRECT_URI
-FORTY_TWO_ALLOWED_KINDS=student
+FORTY_TWO_ALLOWED_KINDS=student,alumni,staff
 FORTY_TWO_ALLOWED_CAMPUS_IDS=
 FORTY_TWO_ALLOW_POOLERS=no
 DATABASE_URL
@@ -64,7 +64,7 @@ CRON_SECRET
 
 Access policy values are server-only and comma-separated where applicable:
 
-- `FORTY_TWO_ALLOWED_KINDS` accepts `student`, `alumni`, and `staff`. The default is `student`.
+- `FORTY_TWO_ALLOWED_KINDS` accepts `student`, `alumni`, and `staff`. All three are enabled by default.
 - `FORTY_TWO_ALLOW_POOLERS` accepts `yes`/`no`, `true`/`false`, or `1`/`0`. The default is `no`.
 - `FORTY_TWO_ALLOWED_CAMPUS_IDS` accepts additional numeric primary-campus IDs such as `993,444`. The dynamically discovered Tetouan pool campus is always included.
 
