@@ -25,6 +25,7 @@ type StartupFailure = {
     diagnostic?: {
       name: string
       code?: string
+      missingModule?: string
     }
   }
 }
@@ -65,12 +66,23 @@ export function toStartupFailure(error: unknown): StartupFailure {
 
   const name = error instanceof Error ? error.name : 'UnknownError'
   const code = isRecord(error) && typeof error.code === 'string' ? error.code : undefined
+  const missingModule =
+    code === 'ERR_MODULE_NOT_FOUND' && error instanceof Error
+      ? error.message
+          .match(/Cannot find (?:module|package) ['"]([^'"]+)['"]/)?.[1]
+          ?.replace(/^file:\/\//, '')
+          .replace(/^\/var\/task\//, '')
+      : undefined
   return {
     status: 503,
     body: {
       error: 'API_STARTUP_FAILED',
       message: 'The API failed to start. Check the Vercel Function logs.',
-      diagnostic: { name, ...(code ? { code } : {}) },
+      diagnostic: {
+        name,
+        ...(code ? { code } : {}),
+        ...(missingModule ? { missingModule } : {}),
+      },
     },
   }
 }

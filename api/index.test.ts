@@ -24,9 +24,12 @@ describe('Vercel API startup failures', () => {
   })
 
   it('returns a safe diagnostic for non-configuration startup errors', () => {
-    const error = Object.assign(new Error('Do not expose this message'), {
-      code: 'ERR_MODULE_NOT_FOUND',
-    })
+    const error = Object.assign(
+      new Error(
+        "Cannot find module '/var/task/server/app.ts' imported from /var/task/api/index.js; secret detail"
+      ),
+      { code: 'ERR_MODULE_NOT_FOUND' }
+    )
 
     expect(toStartupFailure(error)).toEqual({
       status: 503,
@@ -36,6 +39,7 @@ describe('Vercel API startup failures', () => {
         diagnostic: {
           name: 'Error',
           code: 'ERR_MODULE_NOT_FOUND',
+          missingModule: 'server/app.ts',
         },
       },
     })
