@@ -7,6 +7,7 @@ const PISCINE_DURATION_MS = 28 * 24 * 60 * 60 * 1000
 const EXAM_DURATION_MS = 4 * 60 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 12_000
 const POOL_DISCOVERY_TIMEOUT_MS = 30_000
+const POOL_CACHE_MS = 5 * 60 * 1_000
 
 type ImageShape = {
   link?: string | null
@@ -535,7 +536,7 @@ export class FortyTwoClient {
       poolers,
       exams,
     }
-    this.poolCache = { value: snapshot, expiresAt: Date.now() + 60_000 }
+    this.poolCache = { value: snapshot, expiresAt: Date.now() + POOL_CACHE_MS }
     return snapshot
   }
 

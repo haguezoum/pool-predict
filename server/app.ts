@@ -394,8 +394,13 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       if (synced.pool.id !== routeParam(req, 'poolId')) {
         throw new ApiError(409, 'LIVE_DATA_CURRENT_POOL_ONLY', 'Live pooler data is available for the current pool')
       }
+      const now = new Date()
       const resultMaps = await Promise.all(
-        synced.snapshot.exams.map((exam) => fortyTwo.getExamResults(synced.snapshot, exam))
+        synced.snapshot.exams.map((exam) =>
+          exam.lockAt <= now
+            ? fortyTwo.getExamResults(synced.snapshot, exam)
+            : Promise.resolve(new Map())
+        )
       )
       res.json(
         synced.snapshot.poolers.map((pooler) => ({

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import type { Env } from './env.js'
 import type { FortyTwoClient } from './services/forty-two.js'
+import type { LivePoolSnapshot } from './services/forty-two.js'
 import type { Repository } from './services/repository.js'
 
 const env: Env = {
@@ -117,6 +118,60 @@ describe('Express API boundary', () => {
     })
     expect(fortyTwo.getCurrentPool).not.toHaveBeenCalled()
     expect(fortyTwo.getExamResults).not.toHaveBeenCalled()
+  })
+
+  it('loads poolers without requesting results for exams that are still open', async () => {
+    const user = { id: 'user-id', intraUserId: 7 }
+    const now = Date.now()
+    const snapshot: LivePoolSnapshot = {
+      externalRef: 'piscine-c:55:2026-07-06',
+      campusId: 55,
+      cursusId: 9,
+      startsAt: new Date(now - 7 * 24 * 60 * 60 * 1_000),
+      endsAt: new Date(now + 21 * 24 * 60 * 60 * 1_000),
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      exams: [
+        {
+          code: '00',
+          externalExamId: 1,
+          externalProjectId: 1301,
+          lockAt: new Date(now - 60_000),
+          endsAt: new Date(now + 60_000),
+        },
+        {
+          code: '01',
+          externalExamId: 2,
+          externalProjectId: 1302,
+          lockAt: new Date(now + 24 * 60 * 60 * 1_000),
+          endsAt: new Date(now + 25 * 60 * 60 * 1_000),
+        },
+      ],
+    }
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({ user }),
+      upsertPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [] }),
+    } as unknown as Repository
+    const getExamResults = vi.fn().mockResolvedValue(
+      new Map([[42, { validated: true, score: 80 }]])
+    )
+    const fortyTwo = {
+      getCurrentPool: vi.fn().mockResolvedValue(snapshot),
+      getExamResults,
+    } as unknown as FortyTwoClient
+    const app = createApp({ env, repository, fortyTwo })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/pools/pool-id/poolers')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(200)
+    expect(getExamResults).toHaveBeenCalledOnce()
+    expect(getExamResults).toHaveBeenCalledWith(snapshot, snapshot.exams[0])
+    expect(response.body[0].results).toEqual([
+      { code: '00', validated: true, score: 80 },
+      { code: '01', validated: null, score: null },
+    ])
   })
 
   it('rejects cross-origin state-changing requests', async () => {
