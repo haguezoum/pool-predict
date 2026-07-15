@@ -1,23 +1,14 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { TrophyIcon } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
-import { leaderboard } from '@/lib/mock-data'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { api } from '@/lib/api'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 function rankStyle(rank: number) {
@@ -28,191 +19,179 @@ function rankStyle(rank: number) {
 }
 
 function initials(name: string) {
-  return name
-    .split(' ')
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
 }
 
 export function LeaderboardPage() {
   const { user } = useAuth()
+  const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null)
+  const poolQuery = useQuery({ queryKey: ['pools'], queryFn: api.pools })
+  const activePoolId = selectedPoolId ?? poolQuery.data?.[0]?.id
+  const selectedPool = poolQuery.data?.find((pool) => pool.id === activePoolId)
+  const leaderboardQuery = useQuery({
+    queryKey: ['leaderboard', activePoolId],
+    queryFn: () => api.leaderboard(activePoolId),
+    enabled: Boolean(activePoolId),
+  })
+  const leaderboard = leaderboardQuery.data ?? []
   const top3 = leaderboard.slice(0, 3)
-  const rest = leaderboard.slice(3)
+
+  if (poolQuery.isPending || leaderboardQuery.isPending) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-10 w-56" />
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }, (_, index) => (
+            <Skeleton key={index} className="h-56" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    )
+  }
+
+  if (poolQuery.error || leaderboardQuery.error) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+          <p className="font-medium">The leaderboard could not be refreshed.</p>
+          <p className="text-sm text-muted-foreground">Existing totals are safe. Try again shortly.</p>
+          <Button onClick={() => leaderboardQuery.refetch()}>Try again</Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <TrophyIcon className="size-5 text-primary" />
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Leaderboard
-          </h1>
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <TrophyIcon className="size-5 text-primary" />
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {selectedPool?.status === 'closed' ? 'Archived pool' : 'Current pool'} · shared ranks depend only on total score.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Season rankings across the campus pool tables.
-        </p>
-      </section>
-
-      {/* Podium — stacks on mobile, row on sm+ */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
-        {top3.map((entry, i) => {
-          const order = i === 0 ? 'sm:order-2' : i === 1 ? 'sm:order-1' : 'sm:order-3'
-          const height =
-            i === 0 ? 'sm:pb-8 sm:pt-6' : i === 1 ? 'sm:pb-5 sm:pt-4' : 'sm:pb-3 sm:pt-3'
-          return (
-            <Card
-              key={entry.login}
-              size="sm"
-              className={cn(
-                order,
-                height,
-                entry.login === user?.login && 'ring-2 ring-primary/40'
-              )}
+        {(poolQuery.data?.length ?? 0) > 1 ? (
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            Pool
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={activePoolId}
+              onChange={(event) => setSelectedPoolId(event.target.value)}
             >
-              <CardHeader className="items-center text-center">
-                <span
-                  className={cn(
-                    'flex size-8 items-center justify-center rounded-full text-sm font-bold tabular-nums',
-                    rankStyle(entry.rank)
-                  )}
-                >
-                  {entry.rank}
-                </span>
-                <Avatar className="size-12 mx-auto mt-2">
-                  <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
-                </Avatar>
-                <CardTitle className="mt-2 text-sm sm:text-base">
-                  {entry.displayName}
-                </CardTitle>
-                <CardDescription>@{entry.login}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-1 pt-0">
-                <p className="text-xl font-semibold tabular-nums">
-                  {entry.points.toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {entry.accuracy}% accuracy
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
+              {poolQuery.data?.map((pool) => (
+                <option key={pool.id} value={pool.id}>
+                  {new Date(pool.startsAt).toLocaleDateString()} · {pool.status === 'closed' ? 'Archived' : 'Current'}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </section>
 
-      {/* Full table — card list on mobile, table on md+ */}
-      <section className="flex flex-col gap-3 md:hidden">
-        {rest.map((entry) => (
-          <Card
-            key={entry.login}
-            size="sm"
-            className={cn(
-              entry.login === user?.login && 'ring-2 ring-primary/40'
-            )}
-          >
-            <CardContent className="flex items-center gap-3 pt-(--card-spacing)">
-              <span
-                className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums',
-                  rankStyle(entry.rank)
-                )}
+      {top3.length > 0 ? (
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
+          {top3.map((entry, index) => {
+            const order = index === 0 ? 'sm:order-2' : index === 1 ? 'sm:order-1' : 'sm:order-3'
+            const height = index === 0 ? 'sm:pb-8 sm:pt-6' : index === 1 ? 'sm:pb-5 sm:pt-4' : 'sm:pb-3 sm:pt-3'
+            return (
+              <Card
+                key={entry.intraUserId}
+                size="sm"
+                className={cn(order, height, entry.login === user?.login && 'ring-2 ring-primary/40')}
               >
+                <CardHeader className="items-center text-center">
+                  <span className={cn('flex size-8 items-center justify-center rounded-full text-sm font-bold tabular-nums', rankStyle(entry.rank))}>
+                    {entry.rank}
+                  </span>
+                  <Avatar className="mx-auto mt-2 size-12">
+                    <AvatarImage src={entry.avatarUrl} alt={entry.login} />
+                    <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
+                  </Avatar>
+                  <CardTitle className="mt-2 text-sm sm:text-base">{entry.displayName}</CardTitle>
+                  <CardDescription>@{entry.login}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-1 pt-0">
+                  <p className="text-xl font-semibold tabular-nums">{entry.totalScore}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {entry.exactHits} exact · {entry.accuracy}% correct
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-3 md:hidden">
+        {leaderboard.map((entry) => (
+          <Card key={entry.intraUserId} size="sm" className={cn(entry.login === user?.login && 'ring-2 ring-primary/40')}>
+            <CardContent className="flex items-center gap-3 pt-(--card-spacing)">
+              <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
                 {entry.rank}
               </span>
               <Avatar size="sm">
+                <AvatarImage src={entry.avatarUrl} alt={entry.login} />
                 <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
                   {entry.displayName}
-                  {entry.login === user?.login && (
-                    <Badge variant="secondary" className="ml-1.5 align-middle">
-                      You
-                    </Badge>
-                  )}
+                  {entry.login === user?.login ? <Badge variant="secondary" className="ml-1.5">You</Badge> : null}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  @{entry.login} · {entry.accuracy}%
-                </p>
+                <p className="truncate text-xs text-muted-foreground">@{entry.login} · {entry.exactHits} exact</p>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-semibold tabular-nums">
-                  {entry.points.toLocaleString()}
-                </p>
-                <p className="text-[0.65rem] text-muted-foreground">
-                  {entry.streak > 0 ? `${entry.streak} streak` : '—'}
-                </p>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold tabular-nums">{entry.totalScore}</p>
+                <p className="text-[0.65rem] text-muted-foreground">{entry.missedExams} missed</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </section>
 
-      <Card className="hidden md:block overflow-hidden py-0">
+      <Card className="hidden overflow-hidden py-0 md:block">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">Rank</TableHead>
-              <TableHead>Player</TableHead>
+              <TableHead>Student</TableHead>
               <TableHead className="text-right">Predictions</TableHead>
-              <TableHead className="text-right">Accuracy</TableHead>
-              <TableHead className="text-right">Streak</TableHead>
-              <TableHead className="text-right">Points</TableHead>
+              <TableHead className="text-right">Exact</TableHead>
+              <TableHead className="text-right">Missed exams</TableHead>
+              <TableHead className="text-right">Score</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {leaderboard.map((entry) => (
-              <TableRow
-                key={entry.login}
-                className={cn(
-                  entry.login === user?.login && 'bg-primary/5'
-                )}
-              >
+              <TableRow key={entry.intraUserId} className={cn(entry.login === user?.login && 'bg-primary/5')}>
                 <TableCell>
-                  <span
-                    className={cn(
-                      'inline-flex size-7 items-center justify-center rounded-full text-xs font-bold tabular-nums',
-                      rankStyle(entry.rank)
-                    )}
-                  >
+                  <span className={cn('inline-flex size-7 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
                     {entry.rank}
                   </span>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <Avatar size="sm">
-                      <AvatarFallback>
-                        {initials(entry.displayName)}
-                      </AvatarFallback>
+                      <AvatarImage src={entry.avatarUrl} alt={entry.login} />
+                      <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="font-medium">
                         {entry.displayName}
-                        {entry.login === user?.login && (
-                          <Badge variant="secondary" className="ml-1.5">
-                            You
-                          </Badge>
-                        )}
+                        {entry.login === user?.login ? <Badge variant="secondary" className="ml-1.5">You</Badge> : null}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        @{entry.login}
-                      </span>
+                      <span className="text-xs text-muted-foreground">@{entry.login}</span>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {entry.predictions}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {entry.accuracy}%
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {entry.streak > 0 ? entry.streak : '—'}
-                </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">
-                  {entry.points.toLocaleString()}
-                </TableCell>
+                <TableCell className="text-right tabular-nums">{entry.predictions}</TableCell>
+                <TableCell className="text-right tabular-nums">{entry.exactHits}</TableCell>
+                <TableCell className="text-right tabular-nums">{entry.missedExams}</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">{entry.totalScore}</TableCell>
               </TableRow>
             ))}
           </TableBody>

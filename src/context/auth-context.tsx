@@ -1,57 +1,53 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
-import { mockUser } from '@/lib/mock-data'
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, ApiError } from '@/lib/api'
 import type { User } from '@/types'
-
-const STORAGE_KEY = 'pool-predict-user'
 
 type AuthContextValue = {
   user: User | null
   isAuthenticated: boolean
+  isLoading: boolean
   loginWith42: () => void
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function readStoredUser(): User | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as User
-  } catch {
-    return null
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => readStoredUser())
+  const queryClient = useQueryClient()
+  const { data, isPending } = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      try {
+        return await api.me()
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return null
+        throw error
+      }
+    },
+    staleTime: 15_000,
+  })
 
   const loginWith42 = useCallback(() => {
-    // Placeholder for Intra 42 OAuth — stores a mock session locally
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser))
-    setUser(mockUser)
+    window.location.assign('/api/auth/42')
   }, [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    setUser(null)
-  }, [])
+  const logout = useCallback(async () => {
+    await api.logout()
+    queryClient.setQueryData(['me'], null)
+    queryClient.removeQueries({ queryKey: ['pool'] })
+    queryClient.removeQueries({ queryKey: ['bets'] })
+  }, [queryClient])
 
   const value = useMemo(
     () => ({
-      user,
-      isAuthenticated: Boolean(user),
+      user: data ?? null,
+      isAuthenticated: Boolean(data),
+      isLoading: isPending,
       loginWith42,
       logout,
     }),
-    [user, loginWith42, logout]
+    [data, isPending, loginWith42, logout]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -59,9 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // eslint-disable-next-line react-refresh/only-export-components -- hook colocated with provider
 export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return ctx
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
+  return context
 }

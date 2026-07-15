@@ -1,29 +1,79 @@
-# Pool Predict
+# 1337 Tetouan Pool Predict
 
-Campus pool match predictions for **42 Network**. Sign in with Intra, pick winners, climb the leaderboard.
+Private Exam 00–03 prediction platform for active 42-core students at 1337 MED Tetouan. Current poolers cannot sign in. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
 
-## Stack
+## Rules
 
-- React 19 + TypeScript + Vite
-- Tailwind CSS v4 + shadcn/ui
-- React Router
+- Validated with the exact score: **+3 total**
+- Correct validation outcome with another score: **+1**
+- Correct not-validated prediction: **+1**
+- Wrong validation outcome: **-1**
+- No predictions at all before an eligible exam locks: one **-2**
+- Unpredicted individual poolers: **0**
+- Equal totals receive the same SQL `rank()`
 
-## Scripts
+The first successful login enrolls a student in the current pool. Missed-exam penalties apply only to exams that lock after enrollment, never retroactively. Predictions remain private until the exam lock.
+
+## Architecture
+
+- `src/`: React 19, Vite, TanStack Query, React Router, and the existing Tailwind/shadcn UI
+- `server/`: TypeScript Express API, 42 OAuth/live data client, settlement service, and Drizzle repository
+- `api/index.ts`: the single Vercel Function entry
+- `shared/`: browser/server API contracts
+- `supabase/migrations/`: private `pool_predict` PostgreSQL schema and restricted API role
+
+The browser only calls `/api`. It never receives a database credential, 42 client secret, user OAuth access token, or Supabase secret. The API exchanges the 42 authorization code, verifies `/v2/me`, creates a hashed local session, and discards the OAuth token.
+
+Only internal IDs, 42 numeric references, pool/exam timestamps, bets, score events, totals/ranks, and sync metadata are stored. Names, logins, avatars, campus/cursus objects, pooler profiles, 42 payloads, and final marks stay live in 42 and are not copied to Supabase.
+
+## Local setup
+
+1. Copy `.env.example` to `.env` and configure the listed values.
+2. Use a Supavisor transaction-mode URL on port 6543 for `DATABASE_URL`.
+3. Use the direct/session URL only for `DIRECT_DATABASE_URL` and migrations.
+4. In the 42 application settings, register the exact `FORTY_TWO_REDIRECT_URI`. This must be the callback (for example `http://localhost:5173/api/auth/42/callback`), not 42's `/oauth/authorize` URL.
+5. Apply migrations with `npm run db:migrate` or the Supabase CLI.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build
-npm run preview
+npm run dev
 ```
 
-## Pages
+The web app runs at `http://localhost:5173` and proxies `/api` to Express at `http://127.0.0.1:3001`. Use the `localhost` browser URL so the OAuth state cookie and callback stay on the same host.
 
-| Route | Description |
-|-------|-------------|
-| `/login` | 42 Network sign-in only |
-| `/` | Main matches board (protected) |
-| `/leaderboard` | Season rankings (protected) |
-| `/profile` | User stats & logout (protected) |
+## Environment
 
-Auth is currently a **local mock** (`localStorage`). Wire `loginWith42` in `src/context/auth-context.tsx` to real Intra OAuth when ready.
+Required on Vercel:
+
+```text
+APP_ORIGIN
+FORTY_TWO_CLIENT_ID
+FORTY_TWO_CLIENT_SECRET
+FORTY_TWO_REDIRECT_URI
+DATABASE_URL
+DIRECT_DATABASE_URL
+DATABASE_ROLE=pool_predict_api
+SESSION_SECRET
+CRON_SECRET
+```
+
+`FORTY_TWO_TETOUAN_CAMPUS_ID` is optional. When omitted, the API discovers the campus by the `1337 MED` / `Tetouan` campus data returned by 42.
+
+The PostgreSQL client disables prepared statements and makes every runtime connection assume the restricted `pool_predict_api` role. `DIRECT_DATABASE_URL` is read by migration tooling only.
+
+## Commands
+
+```bash
+npm run dev       # Vite + Express
+npm test          # scoring, eligibility, and API boundary tests
+npm run lint
+npm run build
+npm run db:generate
+npm run db:migrate
+```
+
+## Deployment
+
+`vercel.json` builds the Vite application, routes `/api/*` to the one Express function, preserves SPA deep links, and invokes `/api/internal/sync` daily. Vercel sends `Authorization: Bearer $CRON_SECRET` to the cron route.
+
+Cron is only a safety refresh. Bet locking and zero-bet eligibility use PostgreSQL `now()` and stored exam lock timestamps, so correctness does not depend on cron timing. When 42 is unavailable, reads fall back only where safe and all new bets are blocked.

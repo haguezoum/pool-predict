@@ -1,8 +1,8 @@
 import {
   CrosshairIcon,
-  FlameIcon,
   LogOutIcon,
   MapPinIcon,
+  MinusCircleIcon,
   TargetIcon,
   TrophyIcon,
 } from 'lucide-react'
@@ -11,70 +11,31 @@ import { useAuth } from '@/context/auth-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
 export function ProfilePage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-
   if (!user) return null
 
-  const initials = user.displayName
-    .split(' ')
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-
-  const winRate =
-    user.wins + user.losses > 0
-      ? Math.round((user.wins / (user.wins + user.losses)) * 100)
-      : 0
+  const initials = user.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+  const stats = [
+    { label: 'Total score', value: user.totalScore.toLocaleString(), icon: TrophyIcon },
+    { label: 'Shared rank', value: `#${user.rank}`, icon: TargetIcon },
+    { label: 'Accuracy', value: `${user.accuracy}%`, icon: CrosshairIcon },
+    { label: 'Missed exams', value: String(user.missedExams), icon: MinusCircleIcon },
+  ]
 
   function handleLogout() {
-    logout()
-    navigate('/login', { replace: true })
+    void logout().then(() => navigate('/login', { replace: true }))
   }
-
-  const stats = [
-    {
-      label: 'Points',
-      value: user.points.toLocaleString(),
-      icon: TrophyIcon,
-    },
-    {
-      label: 'Rank',
-      value: `#${user.rank}`,
-      icon: TargetIcon,
-    },
-    {
-      label: 'Accuracy',
-      value: `${user.accuracy}%`,
-      icon: CrosshairIcon,
-    },
-    {
-      label: 'Streak',
-      value: String(user.streak),
-      icon: FlameIcon,
-    },
-  ]
 
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Profile
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Your prediction record and campus identity.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Profile</h1>
+        <p className="text-sm text-muted-foreground">Live 42 identity and current-pool record.</p>
       </section>
 
       <Card>
@@ -85,28 +46,18 @@ export function ProfilePage() {
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex min-w-0 flex-col gap-1">
-              <CardTitle className="truncate text-xl sm:text-2xl">
-                {user.displayName}
-              </CardTitle>
+              <CardTitle className="truncate text-xl sm:text-2xl">{user.displayName}</CardTitle>
               <CardDescription className="flex flex-wrap items-center gap-2">
                 <span>@{user.login}</span>
-                <Badge variant="secondary" className="font-normal">
-                  lvl {user.level}
-                </Badge>
+                <Badge variant="secondary" className="font-normal">42 core</Badge>
               </CardDescription>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPinIcon className="size-3.5" />
-                {user.campus}
+                <MapPinIcon className="size-3.5" /> {user.campus}
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={handleLogout}
-          >
-            <LogOutIcon data-icon="inline-start" />
-            Log out
+          <Button variant="outline" className="w-full sm:w-auto" onClick={handleLogout}>
+            <LogOutIcon data-icon="inline-start" /> Log out
           </Button>
         </CardHeader>
       </Card>
@@ -116,12 +67,9 @@ export function ProfilePage() {
           <Card key={label} size="sm">
             <CardContent className="flex flex-col gap-2 pt-(--card-spacing)">
               <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Icon className="size-3.5" />
-                <span className="text-xs">{label}</span>
+                <Icon className="size-3.5" /> <span className="text-xs">{label}</span>
               </div>
-              <p className="text-2xl font-semibold tabular-nums tracking-tight">
-                {value}
-              </p>
+              <p className="text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
             </CardContent>
           </Card>
         ))}
@@ -129,50 +77,35 @@ export function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Season record</CardTitle>
-          <CardDescription>
-            Wins and losses from settled predictions
-          </CardDescription>
+          <CardTitle>Current pool record</CardTitle>
+          <CardDescription>Settled prediction events from Exam 00–03</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="grid grid-cols-3 gap-3 text-center sm:gap-6">
             <div className="flex flex-col gap-1">
-              <span className="text-2xl font-semibold tabular-nums text-primary">
-                {user.wins}
-              </span>
-              <span className="text-xs text-muted-foreground">Wins</span>
+              <span className="text-2xl font-semibold tabular-nums text-emerald-600">{user.correct}</span>
+              <span className="text-xs text-muted-foreground">Correct</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-2xl font-semibold tabular-nums">
-                {user.losses}
-              </span>
-              <span className="text-xs text-muted-foreground">Losses</span>
+              <span className="text-2xl font-semibold tabular-nums">{user.exactHits}</span>
+              <span className="text-xs text-muted-foreground">Exact +3</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-2xl font-semibold tabular-nums">
-                {winRate}%
-              </span>
-              <span className="text-xs text-muted-foreground">Win rate</span>
+              <span className="text-2xl font-semibold tabular-nums text-red-500">{user.wrong}</span>
+              <span className="text-xs text-muted-foreground">Wrong</span>
             </div>
           </div>
-
           <Separator />
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Total predictions</span>
-              <span className="font-medium tabular-nums">{user.predictions}</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${winRate}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {user.wins} of {user.wins + user.losses} settled picks correct
-            </p>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Settled predictions</span>
+            <span className="font-medium tabular-nums">{user.predictions}</span>
           </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${user.accuracy}%` }} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Each exam with zero predictions adds one −2 event. Partial participation avoids it.
+          </p>
         </CardContent>
       </Card>
     </div>

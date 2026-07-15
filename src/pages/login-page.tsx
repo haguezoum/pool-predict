@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { FortyTwoLogo } from '@/components/icons/forty-two-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -12,9 +12,22 @@ import {
 } from '@/components/ui/card'
 
 export function LoginPage() {
-  const { isAuthenticated, loginWith42 } = useAuth()
+  const { isAuthenticated, isLoading, loginWith42 } = useAuth()
+  const [searchParams] = useSearchParams()
 
-  if (isAuthenticated) {
+  const error = searchParams.get('error')
+  const errorMessage = error
+    ? {
+        INELIGIBLE_CAMPUS: 'Only active students from the 1337 MED Tetouan campus can join.',
+        POOLER_ACCESS_DENIED: 'Current poolers cannot enter the prediction platform.',
+        STAFF_ACCESS_DENIED: 'Staff accounts cannot join this student leaderboard.',
+        INELIGIBLE_STUDENT: 'Only active 42-core students can join.',
+        SOURCE_UNAVAILABLE: '42 is temporarily unavailable. Please try again shortly.',
+        INVALID_OAUTH_STATE: 'The sign-in request expired. Please start again.',
+      }[error] ?? 'Sign-in could not be completed. Please try again.'
+    : null
+
+  if (!isLoading && isAuthenticated) {
     return <Navigate to="/" replace />
   }
 
@@ -53,8 +66,8 @@ export function LoginPage() {
               1337 Pool Predict
             </h1>
             <p className="max-w-xs text-sm text-muted-foreground leading-relaxed">
-              Predict campus pool matches. Climb the board. Only for 42
-              students.
+              Predict Piscine Exam 00–03 outcomes. Only active 42-core students
+              from 1337 MED Tetouan can join.
             </p>
           </div>
         </div>
@@ -67,20 +80,26 @@ export function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {errorMessage ? (
+              <p className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {errorMessage}
+              </p>
+            ) : null}
             <Button
               type="button"
               size="lg"
               className="h-11 w-full gap-2.5 text-sm font-medium"
               onClick={loginWith42}
+              disabled={isLoading}
             >
               <FortyTwoLogo data-icon="inline-start" className="size-5" />
-              Sign in and continue
+              {isLoading ? 'Checking session…' : 'Sign in and continue'}
             </Button>
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          By continuing you agree to campus house rules.
+          Current poolers cannot access the platform.
         </p>
       </div>
     </div>

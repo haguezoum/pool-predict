@@ -81,8 +81,7 @@ export function AppShell() {
       .toUpperCase() ?? '?'
 
   function handleLogout() {
-    logout()
-    navigate('/login', { replace: true })
+    void logout().then(() => navigate('/login', { replace: true }))
   }
 
   return (
