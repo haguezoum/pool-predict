@@ -1,5 +1,5 @@
-import { EXAM_CODES, type ExamCode } from '../../shared/contracts.ts'
-import { getEnv, type Env } from '../env.ts'
+import { EXAM_CODES, type ExamCode } from '../../shared/contracts.js'
+import { getEnv, type Env } from '../env.js'
 
 const API_ORIGIN = 'https://api.intra.42.fr'
 const PAGE_SIZE = 100

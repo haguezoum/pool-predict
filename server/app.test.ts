@@ -1,10 +1,10 @@
 import type { Server } from 'node:http'
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp } from './app.ts'
-import type { Env } from './env.ts'
-import type { FortyTwoClient } from './services/forty-two.ts'
-import type { Repository } from './services/repository.ts'
+import { createApp } from './app.js'
+import type { Env } from './env.js'
+import type { FortyTwoClient } from './services/forty-two.js'
+import type { Repository } from './services/repository.js'
 
 const env: Env = {
   nodeEnv: 'test',

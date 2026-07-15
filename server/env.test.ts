@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAppOrigin, resolveRedirectUri } from './env.ts'
+import { resolveAppOrigin, resolveRedirectUri } from './env.js'
 
 describe('application origin configuration', () => {
   it('uses the Vercel production host when APP_ORIGIN is absent', () => {

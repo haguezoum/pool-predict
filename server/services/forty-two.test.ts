@@ -3,7 +3,7 @@ import {
   isEligibleCoreStudent,
   selectActiveCohort,
   type FortyTwoUser,
-} from './forty-two.ts'
+} from './forty-two.js'
 
 function user(overrides: Partial<FortyTwoUser> = {}): FortyTwoUser {
   return {

@@ -15,17 +15,17 @@ import type {
   PoolSummary,
   PoolView,
   Viewer,
-} from '../shared/contracts.ts'
-import { getDb } from './db/client.ts'
-import { getEnv, type Env } from './env.ts'
+} from '../shared/contracts.js'
+import { getDb } from './db/client.js'
+import { getEnv, type Env } from './env.js'
 import {
   FortyTwoClient,
   FortyTwoUnavailableError,
   isEligibleCoreStudent,
   toPublicUser,
-} from './services/forty-two.ts'
-import { Repository, type AppUserRow, type ExamRow } from './services/repository.ts'
-import { getPoolStatus, settlePool, syncPool, type SyncedPool } from './services/sync.ts'
+} from './services/forty-two.js'
+import { Repository, type AppUserRow, type ExamRow } from './services/repository.js'
+import { getPoolStatus, settlePool, syncPool, type SyncedPool } from './services/sync.js'
 
 const SESSION_COOKIE = 'pool_predict_session'
 const OAUTH_STATE_COOKIE = 'pool_predict_oauth_state'

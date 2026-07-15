@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
-import type { BetInput } from '../../shared/contracts.ts'
-import type { Database } from '../db/client.ts'
+import type { BetInput } from '../../shared/contracts.js'
+import type { Database } from '../db/client.js'
 import {
   appUsers,
   bets,
@@ -10,8 +10,8 @@ import {
   poolRefs,
   scoreEvents,
   sessions,
-} from '../db/schema.ts'
-import type { LivePoolSnapshot } from './forty-two.ts'
+} from '../db/schema.js'
+import type { LivePoolSnapshot } from './forty-two.js'
 
 export type AppUserRow = typeof appUsers.$inferSelect
 export type PoolRow = typeof poolRefs.$inferSelect

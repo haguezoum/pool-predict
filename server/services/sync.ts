@@ -1,7 +1,7 @@
-import type { ExamCode } from '../../shared/contracts.ts'
-import { scoreBet } from '../domain/scoring.ts'
-import type { ExamRow, Repository } from './repository.ts'
-import type { FortyTwoClient, LivePoolSnapshot } from './forty-two.ts'
+import type { ExamCode } from '../../shared/contracts.js'
+import { scoreBet } from '../domain/scoring.js'
+import type { ExamRow, Repository } from './repository.js'
+import type { FortyTwoClient, LivePoolSnapshot } from './forty-two.js'
 
 export type SyncedPool = Awaited<ReturnType<Repository['upsertPool']>> & {
   snapshot: LivePoolSnapshot

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { describe, expect, it } from 'vitest'
-import { toStartupFailure } from './index.ts'
+import { toStartupFailure } from './index.js'
 
 describe('Vercel API startup failures', () => {
   it('reports the environment variables represented by validation issues', () => {

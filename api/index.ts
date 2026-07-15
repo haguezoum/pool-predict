@@ -98,7 +98,7 @@ export function toStartupFailure(error: unknown): StartupFailure {
 }
 
 function createAppPromise() {
-  return import('../server/app.ts').then(({ createApp }) => createApp())
+  return import('../server/app.js').then(({ createApp }) => createApp())
 }
 
 let appPromise: ReturnType<typeof createAppPromise> | undefined

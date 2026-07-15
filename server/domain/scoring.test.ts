@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { noBetPenalty, scoreBet } from './scoring.ts'
+import { noBetPenalty, scoreBet } from './scoring.js'
 
 describe('scoreBet', () => {
   it('awards +3 total for an exact validated score', () => {

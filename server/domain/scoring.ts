@@ -1,4 +1,4 @@
-import type { Prediction } from '../../shared/contracts.ts'
+import type { Prediction } from '../../shared/contracts.js'
 
 export type SettledResult = {
   validated: boolean

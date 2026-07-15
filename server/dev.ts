@@ -1,6 +1,6 @@
 import 'dotenv/config'
-import { createApp } from './app.ts'
-import { getEnv } from './env.ts'
+import { createApp } from './app.js'
+import { getEnv } from './env.js'
 
 const env = getEnv()
 createApp().listen(env.apiPort, '127.0.0.1', () => {
