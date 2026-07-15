@@ -1,5 +1,5 @@
 import { EXAM_CODES, type ExamCode } from '../../shared/contracts.js'
-import { getEnv, type Env, type UserKind } from '../env.js'
+import { getEnv, USER_KINDS, type Env, type UserKind } from '../env.js'
 
 const API_ORIGIN = 'https://api.intra.42.fr'
 const PAGE_SIZE = 100
@@ -237,15 +237,8 @@ type EligibilityPolicy = {
 }
 
 function userKind(user: FortyTwoUser): UserKind | null {
-  if (user['staff?'] || user.kind === 'staff') return 'staff'
-  if (user['alumni?']) return 'alumni'
-
-  const activeCore = user.cursus_users?.some((entry) => {
-    const slug = entry.cursus?.slug?.toLowerCase()
-    const name = entry.cursus?.name?.toLowerCase()
-    return (slug === '42' || name === '42') && !entry.end_at
-  })
-  return user['active?'] !== false && activeCore ? 'student' : null
+  const kind = user.kind?.toLowerCase()
+  return USER_KINDS.find((candidate) => candidate === kind) ?? null
 }
 
 export function isEligibleUser(
@@ -259,11 +252,8 @@ export function isEligibleUser(
   if (!primaryCampus || !policy.allowedCampusIds.has(primaryCampus.campus_id)) {
     return { eligible: false, reason: 'INELIGIBLE_CAMPUS' } as const
   }
-  if (kind === 'staff' && !policy.allowedKinds.has(kind)) {
-    return { eligible: false, reason: 'STAFF_ACCESS_DENIED' } as const
-  }
   if (!kind || !policy.allowedKinds.has(kind)) {
-    return { eligible: false, reason: 'INELIGIBLE_STUDENT' } as const
+    return { eligible: false, reason: 'USER_KIND_NOT_ALLOWED' } as const
   }
   if (!policy.allowPoolers && activePoolerIds.has(user.id)) {
     return { eligible: false, reason: 'POOLER_ACCESS_DENIED' } as const

@@ -20,6 +20,7 @@ export function LoginPage() {
     ? {
         INELIGIBLE_CAMPUS: 'Only active students from the 1337 MED Tetouan campus can join.',
         POOLER_ACCESS_DENIED: 'Current poolers cannot enter the prediction platform.',
+        USER_KIND_NOT_ALLOWED: 'This type of 42 account is not allowed to join.',
         STAFF_ACCESS_DENIED: 'Staff accounts cannot join this student leaderboard.',
         INELIGIBLE_STUDENT: 'Only active 42-core students can join.',
         SOURCE_UNAVAILABLE: '42 is temporarily unavailable. Please try again shortly.',

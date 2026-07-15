@@ -5,12 +5,12 @@ describe('42 access policy configuration', () => {
   it('parses allowed kinds, campus IDs, and yes/no pooler access', () => {
     expect(
       parseAccessPolicy({
-        allowedKinds: 'student, alumni, staff',
+        allowedKinds: 'admin, student, external',
         allowedCampusIds: '993, 444, 993',
         allowPoolers: 'yes',
       })
     ).toEqual({
-      allowedKinds: ['student', 'alumni', 'staff'],
+      allowedKinds: ['admin', 'student', 'external'],
       allowedCampusIds: [993, 444],
       allowPoolers: true,
     })
@@ -33,7 +33,7 @@ describe('42 access policy configuration', () => {
   it('rejects unknown kinds and malformed campus IDs', () => {
     expect(() =>
       parseAccessPolicy({
-        allowedKinds: 'admin',
+        allowedKinds: 'alumni',
         allowedCampusIds: 'not-an-id',
         allowPoolers: 'sometimes',
       })

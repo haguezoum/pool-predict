@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const USER_KINDS = ['student', 'alumni', 'staff'] as const
+export const USER_KINDS = ['admin', 'student', 'external'] as const
 export type UserKind = (typeof USER_KINDS)[number]
 const DEFAULT_ALLOWED_KINDS = USER_KINDS.join(',')
 

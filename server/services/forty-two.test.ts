@@ -10,6 +10,7 @@ function user(overrides: Partial<FortyTwoUser> = {}): FortyTwoUser {
   return {
     id: 42,
     login: 'student',
+    kind: 'student',
     'active?': true,
     'alumni?': false,
     'staff?': false,
@@ -61,27 +62,38 @@ describe('42 eligibility', () => {
     ).toBe(true)
   })
 
-  it('allows staff only when staff is configured', () => {
-    const staff = user({ 'staff?': true, kind: 'staff' })
-    expect(isEligibleUser(staff, policy(), new Set()).reason).toBe('STAFF_ACCESS_DENIED')
+  it('allows admin only when admin is configured', () => {
+    const admin = user({ kind: 'admin' })
+    expect(isEligibleUser(admin, policy(), new Set()).reason).toBe('USER_KIND_NOT_ALLOWED')
     expect(
-      isEligibleUser(staff, policy({ allowedKinds: ['staff'] }), new Set()).eligible
+      isEligibleUser(admin, policy({ allowedKinds: ['admin'] }), new Set()).eligible
     ).toBe(true)
   })
 
-  it('allows alumni only when alumni is configured', () => {
-    const alumni = user({ 'alumni?': true, 'active?': false, cursus_users: [] })
-    expect(isEligibleUser(alumni, policy(), new Set()).eligible).toBe(false)
+  it('allows external only when external is configured', () => {
+    const external = user({ kind: 'external' })
+    expect(isEligibleUser(external, policy(), new Set()).reason).toBe(
+      'USER_KIND_NOT_ALLOWED'
+    )
     expect(
-      isEligibleUser(alumni, policy({ allowedKinds: ['alumni'] }), new Set()).eligible
+      isEligibleUser(external, policy({ allowedKinds: ['external'] }), new Set()).eligible
     ).toBe(true)
   })
 
-  it.each([
-    { 'active?': false },
-    { cursus_users: [] },
-  ] as Partial<FortyTwoUser>[])('rejects inactive core student eligibility', (override) => {
-    expect(isEligibleUser(user(override), policy(), new Set()).eligible).toBe(false)
+  it('uses kind directly without conflicting with active or alumni flags', () => {
+    const alumniStudent = user({
+      kind: 'student',
+      'alumni?': true,
+      'active?': false,
+      cursus_users: [],
+    })
+    expect(isEligibleUser(alumniStudent, policy(), new Set()).eligible).toBe(true)
+  })
+
+  it('rejects an undocumented kind', () => {
+    expect(
+      isEligibleUser(user({ kind: 'staff' }), policy(), new Set()).reason
+    ).toBe('USER_KIND_NOT_ALLOWED')
   })
 })
 
