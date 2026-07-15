@@ -1,6 +1,6 @@
 # 1337 Tetouan Pool Predict
 
-Private Exam 00–03 prediction platform for active 42-core students at 1337 MED Tetouan. Current poolers cannot sign in. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
+Private Exam 00–03 prediction platform for the 1337 MED Tetouan Piscine. By default, only active 42-core students may sign in and current poolers are rejected; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
 
 ## Rules
 
@@ -50,6 +50,9 @@ APP_ORIGIN
 FORTY_TWO_CLIENT_ID
 FORTY_TWO_CLIENT_SECRET
 FORTY_TWO_REDIRECT_URI
+FORTY_TWO_ALLOWED_KINDS=student
+FORTY_TWO_ALLOWED_CAMPUS_IDS=
+FORTY_TWO_ALLOW_POOLERS=no
 DATABASE_URL
 DIRECT_DATABASE_URL
 DATABASE_ROLE=pool_predict_api
@@ -58,6 +61,14 @@ CRON_SECRET
 ```
 
 `FORTY_TWO_TETOUAN_CAMPUS_ID` is optional. When omitted, the API discovers the campus by the `1337 MED` / `Tetouan` campus data returned by 42.
+
+Access policy values are server-only and comma-separated where applicable:
+
+- `FORTY_TWO_ALLOWED_KINDS` accepts `student`, `alumni`, and `staff`. The default is `student`.
+- `FORTY_TWO_ALLOW_POOLERS` accepts `yes`/`no`, `true`/`false`, or `1`/`0`. The default is `no`.
+- `FORTY_TWO_ALLOWED_CAMPUS_IDS` accepts additional numeric primary-campus IDs such as `993,444`. The dynamically discovered Tetouan pool campus is always included.
+
+These variables control who may bet on the Tetouan pool; they do not change which campus Piscine is used as the prediction target.
 
 `APP_ORIGIN` is optional on Vercel because the API derives it from `VERCEL_PROJECT_PRODUCTION_URL`. All secrets must still be configured in the Vercel project; local `.env` files are never uploaded by Git deployments.
 

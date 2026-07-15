@@ -1,5 +1,45 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAppOrigin, resolveRedirectUri } from './env.js'
+import { parseAccessPolicy, resolveAppOrigin, resolveRedirectUri } from './env.js'
+
+describe('42 access policy configuration', () => {
+  it('parses allowed kinds, campus IDs, and yes/no pooler access', () => {
+    expect(
+      parseAccessPolicy({
+        allowedKinds: 'student, alumni, staff',
+        allowedCampusIds: '993, 444, 993',
+        allowPoolers: 'yes',
+      })
+    ).toEqual({
+      allowedKinds: ['student', 'alumni', 'staff'],
+      allowedCampusIds: [993, 444],
+      allowPoolers: true,
+    })
+  })
+
+  it('accepts an empty additional campus list and no pooler access', () => {
+    expect(
+      parseAccessPolicy({
+        allowedKinds: 'student',
+        allowedCampusIds: '',
+        allowPoolers: 'no',
+      })
+    ).toEqual({
+      allowedKinds: ['student'],
+      allowedCampusIds: [],
+      allowPoolers: false,
+    })
+  })
+
+  it('rejects unknown kinds and malformed campus IDs', () => {
+    expect(() =>
+      parseAccessPolicy({
+        allowedKinds: 'admin',
+        allowedCampusIds: 'not-an-id',
+        allowPoolers: 'sometimes',
+      })
+    ).toThrow()
+  })
+})
 
 describe('application origin configuration', () => {
   it('uses the Vercel production host when APP_ORIGIN is absent', () => {

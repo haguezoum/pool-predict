@@ -21,7 +21,7 @@ import { getEnv, type Env } from './env.js'
 import {
   FortyTwoClient,
   FortyTwoUnavailableError,
-  isEligibleCoreStudent,
+  isEligibleUser,
   toPublicUser,
 } from './services/forty-two.js'
 import { Repository, type AppUserRow, type ExamRow } from './services/repository.js'
@@ -253,7 +253,19 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
           syncPool(repository, fortyTwo),
         ])
         const poolerIds = new Set(synced.snapshot.poolers.map((pooler) => pooler.intraUserId))
-        const eligibility = isEligibleCoreStudent(me, synced.snapshot.campusId, poolerIds)
+        const allowedCampusIds = new Set([
+          synced.snapshot.campusId,
+          ...env.allowedCampusIds,
+        ])
+        const eligibility = isEligibleUser(
+          me,
+          {
+            allowedCampusIds,
+            allowedKinds: new Set(env.allowedKinds),
+            allowPoolers: env.allowPoolers,
+          },
+          poolerIds
+        )
         if (!eligibility.eligible) {
           return res.redirect(`${env.appOrigin}/login?error=${eligibility.reason}`)
         }

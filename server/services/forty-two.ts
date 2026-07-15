@@ -1,5 +1,5 @@
 import { EXAM_CODES, type ExamCode } from '../../shared/contracts.js'
-import { getEnv, type Env } from '../env.js'
+import { getEnv, type Env, type UserKind } from '../env.js'
 
 const API_ORIGIN = 'https://api.intra.42.fr'
 const PAGE_SIZE = 100
@@ -230,27 +230,42 @@ export function selectActiveCohort(rows: CursusUser[], now: Date) {
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())[0]
 }
 
-export function isEligibleCoreStudent(
-  user: FortyTwoUser,
-  campusId: number,
-  activePoolerIds: ReadonlySet<number>
-) {
-  const primaryCampus = user.campus_users?.find((entry) => entry.is_primary)
-  const onCampus = primaryCampus?.campus_id === campusId
+type EligibilityPolicy = {
+  allowedCampusIds: ReadonlySet<number>
+  allowedKinds: ReadonlySet<UserKind>
+  allowPoolers: boolean
+}
+
+function userKind(user: FortyTwoUser): UserKind | null {
+  if (user['staff?'] || user.kind === 'staff') return 'staff'
+  if (user['alumni?']) return 'alumni'
+
   const activeCore = user.cursus_users?.some((entry) => {
     const slug = entry.cursus?.slug?.toLowerCase()
     const name = entry.cursus?.name?.toLowerCase()
     return (slug === '42' || name === '42') && !entry.end_at
   })
+  return user['active?'] !== false && activeCore ? 'student' : null
+}
 
-  if (!onCampus) return { eligible: false, reason: 'INELIGIBLE_CAMPUS' } as const
-  if (user['staff?'] || user.kind === 'staff') {
+export function isEligibleUser(
+  user: FortyTwoUser,
+  policy: EligibilityPolicy,
+  activePoolerIds: ReadonlySet<number>
+) {
+  const primaryCampus = user.campus_users?.find((entry) => entry.is_primary)
+  const kind = userKind(user)
+
+  if (!primaryCampus || !policy.allowedCampusIds.has(primaryCampus.campus_id)) {
+    return { eligible: false, reason: 'INELIGIBLE_CAMPUS' } as const
+  }
+  if (kind === 'staff' && !policy.allowedKinds.has(kind)) {
     return { eligible: false, reason: 'STAFF_ACCESS_DENIED' } as const
   }
-  if (user['alumni?'] || user['active?'] === false || !activeCore) {
+  if (!kind || !policy.allowedKinds.has(kind)) {
     return { eligible: false, reason: 'INELIGIBLE_STUDENT' } as const
   }
-  if (activePoolerIds.has(user.id)) {
+  if (!policy.allowPoolers && activePoolerIds.has(user.id)) {
     return { eligible: false, reason: 'POOLER_ACCESS_DENIED' } as const
   }
   return { eligible: true, reason: null } as const

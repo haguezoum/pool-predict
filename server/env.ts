@@ -1,5 +1,39 @@
 import { z } from 'zod'
 
+export const USER_KINDS = ['student', 'alumni', 'staff'] as const
+export type UserKind = (typeof USER_KINDS)[number]
+
+const csvValues = z.string().transform((value) =>
+  value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+const campusIdValue = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .pipe(z.number().int().positive())
+
+const accessPolicySchema = z.object({
+  allowedKinds: csvValues
+    .pipe(z.array(z.enum(USER_KINDS)).min(1))
+    .transform((values) => [...new Set(values)]),
+  allowedCampusIds: csvValues
+    .pipe(z.array(campusIdValue))
+    .transform((values) => [...new Set(values)]),
+  allowPoolers: z
+    .string()
+    .transform((value) => value.trim().toLowerCase())
+    .pipe(z.enum(['true', 'false', 'yes', 'no', '1', '0']))
+    .transform((value) => ['true', 'yes', '1'].includes(value)),
+})
+
+export function parseAccessPolicy(input: z.input<typeof accessPolicySchema>) {
+  return accessPolicySchema.parse(input)
+}
+
 export function resolveAppOrigin(
   explicitOrigin: string | undefined,
   productionHost: string | undefined,
@@ -49,6 +83,9 @@ const raw = {
     process.env.FORTY_TWO_REDIRECT_URI ?? process.env.REDIRECT_URI
   ),
   campusId: process.env.FORTY_TWO_TETOUAN_CAMPUS_ID,
+  allowedKinds: process.env.FORTY_TWO_ALLOWED_KINDS ?? 'student',
+  allowedCampusIds: process.env.FORTY_TWO_ALLOWED_CAMPUS_IDS ?? '',
+  allowPoolers: process.env.FORTY_TWO_ALLOW_POOLERS ?? 'no',
   databaseUrl:
     process.env.DATABASE_URL ??
     process.env.POSTGRES_URL ??
@@ -70,7 +107,7 @@ const schema = z.object({
   databaseRole: z.string().regex(/^[a-z_][a-z0-9_]*$/),
   sessionSecret: z.string().min(16),
   cronSecret: z.string().min(16).optional(),
-})
+}).extend(accessPolicySchema.shape)
 
 export type Env = z.infer<typeof schema>
 

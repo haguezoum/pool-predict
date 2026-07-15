@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  isEligibleCoreStudent,
+  isEligibleUser,
   selectActiveCohort,
   type FortyTwoUser,
 } from './forty-two.js'
+import type { UserKind } from '../env.js'
 
 function user(overrides: Partial<FortyTwoUser> = {}): FortyTwoUser {
   return {
@@ -18,28 +19,69 @@ function user(overrides: Partial<FortyTwoUser> = {}): FortyTwoUser {
   }
 }
 
+function policy(overrides: {
+  allowedCampusIds?: number[]
+  allowedKinds?: UserKind[]
+  allowPoolers?: boolean
+} = {}) {
+  return {
+    allowedCampusIds: new Set<number>(overrides.allowedCampusIds ?? [77]),
+    allowedKinds: new Set<UserKind>(overrides.allowedKinds ?? ['student']),
+    allowPoolers: overrides.allowPoolers ?? false,
+  }
+}
+
 describe('42 eligibility', () => {
   it('allows an active Tetouan core student', () => {
-    expect(isEligibleCoreStudent(user(), 77, new Set()).eligible).toBe(true)
+    expect(isEligibleUser(user(), policy(), new Set()).eligible).toBe(true)
   })
 
   it('rejects another primary campus', () => {
-    expect(isEligibleCoreStudent(user(), 12, new Set()).reason).toBe('INELIGIBLE_CAMPUS')
+    expect(
+      isEligibleUser(user(), policy({ allowedCampusIds: [12] }), new Set()).reason
+    ).toBe('INELIGIBLE_CAMPUS')
+  })
+
+  it('allows an explicitly configured additional campus', () => {
+    expect(
+      isEligibleUser(user(), policy({ allowedCampusIds: [77, 993, 444] }), new Set())
+        .eligible
+    ).toBe(true)
   })
 
   it('rejects current poolers', () => {
-    expect(isEligibleCoreStudent(user(), 77, new Set([42])).reason).toBe(
+    expect(isEligibleUser(user(), policy(), new Set([42])).reason).toBe(
       'POOLER_ACCESS_DENIED'
     )
   })
 
+  it('allows current poolers when configured', () => {
+    expect(
+      isEligibleUser(user(), policy({ allowPoolers: true }), new Set([42])).eligible
+    ).toBe(true)
+  })
+
+  it('allows staff only when staff is configured', () => {
+    const staff = user({ 'staff?': true, kind: 'staff' })
+    expect(isEligibleUser(staff, policy(), new Set()).reason).toBe('STAFF_ACCESS_DENIED')
+    expect(
+      isEligibleUser(staff, policy({ allowedKinds: ['staff'] }), new Set()).eligible
+    ).toBe(true)
+  })
+
+  it('allows alumni only when alumni is configured', () => {
+    const alumni = user({ 'alumni?': true, 'active?': false, cursus_users: [] })
+    expect(isEligibleUser(alumni, policy(), new Set()).eligible).toBe(false)
+    expect(
+      isEligibleUser(alumni, policy({ allowedKinds: ['alumni'] }), new Set()).eligible
+    ).toBe(true)
+  })
+
   it.each([
-    { 'staff?': true },
-    { 'alumni?': true },
     { 'active?': false },
     { cursus_users: [] },
-  ] as Partial<FortyTwoUser>[])('rejects non-core student eligibility', (override) => {
-    expect(isEligibleCoreStudent(user(override), 77, new Set()).eligible).toBe(false)
+  ] as Partial<FortyTwoUser>[])('rejects inactive core student eligibility', (override) => {
+    expect(isEligibleUser(user(override), policy(), new Set()).eligible).toBe(false)
   })
 })
 
