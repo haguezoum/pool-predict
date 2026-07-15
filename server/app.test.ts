@@ -74,6 +74,51 @@ describe('Express API boundary', () => {
     expect(response.body.error).toBe('UNAUTHENTICATED')
   })
 
+  it('returns the signed-in viewer without synchronizing or settling the live pool', async () => {
+    const user = { id: 'user-id', intraUserId: 42 }
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({ user }),
+      listUserPools: vi.fn().mockResolvedValue([{ pool: { id: 'pool-id' } }]),
+      getUserStats: vi.fn().mockResolvedValue({
+        total_score: 7,
+        rank: 2,
+        predictions: 4,
+        correct: 3,
+        wrong: 1,
+        exact_hits: 1,
+        missed_exams: 0,
+      }),
+    } as unknown as Repository
+    const fortyTwo = {
+      getUser: vi.fn().mockResolvedValue({
+        id: 42,
+        login: 'tester',
+        displayname: 'Test User',
+        kind: 'student',
+        campus: [{ id: 55, name: '1337 MED' }],
+        campus_users: [{ campus_id: 55, is_primary: true }],
+      }),
+      getCurrentPool: vi.fn(),
+      getExamResults: vi.fn(),
+    } as unknown as FortyTwoClient
+    const app = createApp({ env, repository, fortyTwo })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/me')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      intraUserId: 42,
+      login: 'tester',
+      totalScore: 7,
+      rank: 2,
+    })
+    expect(fortyTwo.getCurrentPool).not.toHaveBeenCalled()
+    expect(fortyTwo.getExamResults).not.toHaveBeenCalled()
+  })
+
   it('rejects cross-origin state-changing requests', async () => {
     const { app } = testApp()
     const { client } = await localRequest(app)

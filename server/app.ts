@@ -214,11 +214,15 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     return next()
   })
 
-  const requireAuth = asyncHandler(async (req, res) => {
-    const auth = await authenticate(req, repository)
-    if (!auth) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in with 42 to continue')
-    res.locals.auth = auth
-  })
+  const requireAuth: RequestHandler = (req, res, next) => {
+    authenticate(req, repository)
+      .then((auth) => {
+        if (!auth) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in with 42 to continue')
+        res.locals.auth = auth
+        next()
+      })
+      .catch(next)
+  }
 
   function authFrom(res: Response): AuthState {
     return res.locals.auth as AuthState
@@ -303,16 +307,13 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     requireAuth,
     asyncHandler(async (_req, res) => {
       const auth = authFrom(res)
-      const [profile, synced] = await Promise.all([
+      const [profile, pools] = await Promise.all([
         fortyTwo.getUser(auth.user.intraUserId),
-        syncPool(repository, fortyTwo),
+        repository.listUserPools(auth.user.id),
       ])
-      const membership =
-        (await repository.getMembership(synced.pool.id, auth.user.id)) ??
-        (await repository.enroll(synced.pool.id, auth.user.id, synced.exams))
-      if (!membership) throw new ApiError(403, 'NOT_ENROLLED', 'Pool enrollment failed')
-      await settlePool(repository, fortyTwo, synced)
-      const stats = await repository.getUserStats(synced.pool.id, auth.user.id)
+      const poolId = pools[0]?.pool.id
+      if (!poolId) throw new ApiError(403, 'NOT_ENROLLED', 'Pool enrollment is missing')
+      const stats = await repository.getUserStats(poolId, auth.user.id)
       const publicUser = toPublicUser(profile)
       const viewer: Viewer = {
         ...publicUser,
