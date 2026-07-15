@@ -18,6 +18,32 @@ export type PoolRow = typeof poolRefs.$inferSelect
 export type ExamRow = typeof examRefs.$inferSelect
 export type BetRow = typeof bets.$inferSelect
 
+type RawBetRow = {
+  id: string
+  pool_id: string
+  exam_id: string
+  user_id: string
+  pooler_intra_id: number | string
+  prediction: BetRow['prediction']
+  predicted_score: number | null
+  created_at: Date | string
+  updated_at: Date | string
+}
+
+function betRowFromSql(row: RawBetRow): BetRow {
+  return {
+    id: row.id,
+    poolId: row.pool_id,
+    examId: row.exam_id,
+    userId: row.user_id,
+    poolerIntraId: Number(row.pooler_intra_id),
+    prediction: row.prediction,
+    predictedScore: row.predicted_score,
+    createdAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at : new Date(row.updated_at),
+  }
+}
+
 export class Repository {
   readonly db: Database
 
@@ -217,7 +243,7 @@ export class Repository {
   }
 
   async upsertBet(userId: string, examId: string, poolerIntraId: number, input: BetInput) {
-    const rows = await this.db.execute<BetRow>(sql`
+    const rows = await this.db.execute<RawBetRow>(sql`
       insert into pool_predict.bets (
         pool_id, exam_id, user_id, pooler_intra_id, prediction, predicted_score
       )
@@ -234,7 +260,7 @@ export class Repository {
         updated_at = now()
       returning *
     `)
-    return rows[0] ?? null
+    return rows[0] ? betRowFromSql(rows[0]) : null
   }
 
   async deleteBet(userId: string, examId: string, poolerIntraId: number) {
