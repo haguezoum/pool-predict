@@ -26,7 +26,7 @@ describe('Vercel API startup failures', () => {
   it('returns a safe diagnostic for non-configuration startup errors', () => {
     const error = Object.assign(
       new Error(
-        "Cannot find module '/var/task/server/app.ts' imported from /var/task/api/index.js; secret detail"
+        "Cannot find module '/var/task/server/app.ts' imported from /var/task/api/index.js; runtime detail"
       ),
       { code: 'ERR_MODULE_NOT_FOUND' }
     )
@@ -40,6 +40,8 @@ describe('Vercel API startup failures', () => {
           name: 'Error',
           code: 'ERR_MODULE_NOT_FOUND',
           missingModule: 'server/app.ts',
+          detail:
+            "Cannot find module 'server/app.ts' imported from api/index.js; runtime detail",
         },
       },
     })

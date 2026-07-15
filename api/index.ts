@@ -26,6 +26,7 @@ type StartupFailure = {
       name: string
       code?: string
       missingModule?: string
+      detail?: string
     }
   }
 }
@@ -66,12 +67,20 @@ export function toStartupFailure(error: unknown): StartupFailure {
 
   const name = error instanceof Error ? error.name : 'UnknownError'
   const code = isRecord(error) && typeof error.code === 'string' ? error.code : undefined
+  const errorMessage = isRecord(error) && typeof error.message === 'string' ? error.message : ''
   const missingModule =
-    code === 'ERR_MODULE_NOT_FOUND' && error instanceof Error
-      ? error.message
+    code === 'ERR_MODULE_NOT_FOUND'
+      ? errorMessage
           .match(/Cannot find (?:module|package) ['"]([^'"]+)['"]/)?.[1]
           ?.replace(/^file:\/\//, '')
           .replace(/^\/var\/task\//, '')
+      : undefined
+  const detail =
+    code === 'ERR_MODULE_NOT_FOUND'
+      ? errorMessage
+          .replaceAll('file:///var/task/', '')
+          .replaceAll('/var/task/', '')
+          .slice(0, 300)
       : undefined
   return {
     status: 503,
@@ -82,6 +91,7 @@ export function toStartupFailure(error: unknown): StartupFailure {
         name,
         ...(code ? { code } : {}),
         ...(missingModule ? { missingModule } : {}),
+        ...(detail ? { detail } : {}),
       },
     },
   }
