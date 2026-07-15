@@ -1,8 +1,24 @@
 import Stack from '@mui/material/Stack'
 import { LineChart } from '@mui/x-charts/LineChart'
+import { useTheme } from '@/context/theme-context'
 import type { FridayResult } from '@/types'
 
 const margin = { top: 12, right: 12, bottom: 4, left: 8 }
+
+/** Chart colors that track light / dark app theme */
+function useChartColors() {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+
+  return {
+    axis: isDark ? 'oklch(0.97 0.01 240)' : 'oklch(0.35 0.04 258)',
+    tickLabel: isDark ? 'oklch(0.85 0.02 245)' : 'oklch(0.45 0.03 250)',
+    grid: isDark ? 'oklch(0.64 0.15 241 / 20%)' : 'oklch(0.50 0.03 250 / 18%)',
+    label: isDark ? 'oklch(0.97 0.01 240)' : 'oklch(0.25 0.04 258)',
+    series: isDark ? '#22c55e' : '#16a34a',
+    markStroke: isDark ? '#16a34a' : '#15803d',
+  }
+}
 
 type FridayLineChartProps = {
   fridays: FridayResult[]
@@ -14,8 +30,10 @@ type FridayLineChartProps = {
  * MUI LineChart of Friday results.
  * - Null points = not validated (gaps; connectNulls bridges the line)
  * - Hover a mark to see the exact score (from API soon)
+ * - Axis / grid / legend colors follow light & dark theme
  */
 export function FridayLineChart({ fridays, login }: FridayLineChartProps) {
+  const colors = useChartColors()
   const xData = fridays.map((f) => f.label)
   const data = fridays.map((f) => f.value)
 
@@ -24,12 +42,16 @@ export function FridayLineChart({ fridays, login }: FridayLineChartProps) {
       <p className="text-xs text-muted-foreground">Last 4 exams</p>
       <Stack sx={{ width: '100%', height: 140, overflow: 'visible' }}>
         <LineChart
+          key={colors.axis}
           xAxis={[
             {
               data: xData,
               scaleType: 'point',
               height: 28,
-              tickLabelStyle: { fill: '#ffffff', fontSize: 10 },
+              tickLabelStyle: {
+                fill: colors.tickLabel,
+                fontSize: 10,
+              },
             },
           ]}
           yAxis={[
@@ -38,7 +60,10 @@ export function FridayLineChart({ fridays, login }: FridayLineChartProps) {
               min: 0,
               max: 100,
               tickNumber: 5,
-              tickLabelStyle: { fill: '#ffffff', fontSize: 10 },
+              tickLabelStyle: {
+                fill: colors.tickLabel,
+                fontSize: 10,
+              },
             },
           ]}
           series={[
@@ -48,7 +73,7 @@ export function FridayLineChart({ fridays, login }: FridayLineChartProps) {
               data,
               connectNulls: true,
               showMark: true,
-              color: '#22c55e',
+              color: colors.series,
               valueFormatter: (value, { dataIndex }) => {
                 const friday = fridays[dataIndex]
                 if (value == null || !friday?.validated) {
@@ -72,35 +97,34 @@ export function FridayLineChart({ fridays, login }: FridayLineChartProps) {
             width: '100%',
             overflow: 'visible',
             '& .MuiChartsAxis-line': {
-              stroke: '#ffffff !important',
+              stroke: `${colors.axis} !important`,
               strokeWidth: 1,
             },
             '& .MuiChartsAxis-tick': {
-              stroke: '#ffffff !important',
+              stroke: `${colors.axis} !important`,
               strokeWidth: 1,
             },
             '& .MuiChartsAxis-tickLabel tspan, & .MuiChartsAxis-tickLabel': {
-              fill: '#ffffff !important',
+              fill: `${colors.tickLabel} !important`,
               fontSize: 10,
             },
             '& .MuiChartsGrid-line': {
-              stroke: 'rgba(255,255,255,0.2)',
+              stroke: colors.grid,
               strokeDasharray: '3 3',
             },
             '& .MuiMarkElement-root': {
-              fill: '#22c55e',
-              stroke: '#16a34a',
+              fill: colors.series,
+              stroke: colors.markStroke,
             },
-            // Legend series label (e.g. @anass) — span uses color
             '& .MuiChartsLabel-root': {
-              color: '#ffffff !important',
+              color: `${colors.label} !important`,
             },
             '& .MuiChartsLegend-series, & .MuiChartsLegend-label, & .MuiChartsLegend-root':
               {
-                color: '#ffffff !important',
+                color: `${colors.label} !important`,
               },
             '& .MuiChartsLegend-series text, & .MuiChartsLegend-label text': {
-              fill: '#ffffff !important',
+              fill: `${colors.label} !important`,
             },
           }}
         />

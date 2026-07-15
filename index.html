@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -10,8 +10,28 @@
       name="description"
       content="1337 Pool Predict — campus pool match predictions for 42 Network"
     />
-    <meta name="theme-color" content="#001030" />
+    <meta name="theme-color" content="#f5f8fc" />
     <title>1337 Pool Predict</title>
+    <script>
+      // Apply theme before paint — default follows the machine
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('pool-predict-theme')
+          var theme =
+            stored === 'light' || stored === 'dark' || stored === 'system'
+              ? stored
+              : 'system'
+          var dark =
+            theme === 'dark' ||
+            (theme === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#001030' : '#f5f8fc')
+        } catch (_) {}
+      })()
+    </script>
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />

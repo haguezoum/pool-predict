@@ -51,6 +51,8 @@ export type Match = {
   login: string
   fullName: string
   avatarUrl: string
+  /** Campus rank (1 = best) */
+  rank: number
   /** Last 4 exams — Exam 1 … Exam 4 */
   fridays: FridayResult[]
   /** Weekly logtime heatmap (API soon) */

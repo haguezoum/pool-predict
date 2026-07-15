@@ -74,6 +74,7 @@ export const matches: Match[] = [
     login: 'anass',
     fullName: 'Anass El',
     avatarUrl: '',
+    rank: 1,
     fridays: [
       { label: fridayLabels[0], validated: true, value: 85, score: '85' },
       { label: fridayLabels[1], validated: false, value: null },
@@ -88,6 +89,7 @@ export const matches: Match[] = [
     login: 'sara',
     fullName: 'Sara M.',
     avatarUrl: '',
+    rank: 2,
     fridays: [
       { label: fridayLabels[0], validated: true, value: 78, score: '78' },
       { label: fridayLabels[1], validated: true, value: 88, score: '88' },
@@ -102,6 +104,7 @@ export const matches: Match[] = [
     login: 'youssef',
     fullName: 'Youssef K.',
     avatarUrl: '',
+    rank: 3,
     fridays: [
       { label: fridayLabels[0], validated: false, value: null },
       { label: fridayLabels[1], validated: true, value: 64, score: '64' },
@@ -116,6 +119,7 @@ export const matches: Match[] = [
     login: 'amina',
     fullName: 'Amina B.',
     avatarUrl: '',
+    rank: 4,
     fridays: [
       { label: fridayLabels[0], validated: true, value: 92, score: '92' },
       { label: fridayLabels[1], validated: true, value: 80, score: '80' },
@@ -130,6 +134,7 @@ export const matches: Match[] = [
     login: 'karim',
     fullName: 'Karim T.',
     avatarUrl: '',
+    rank: 5,
     fridays: [
       { label: fridayLabels[0], validated: false, value: null },
       { label: fridayLabels[1], validated: false, value: null },
@@ -144,6 +149,7 @@ export const matches: Match[] = [
     login: 'lina',
     fullName: 'Lina R.',
     avatarUrl: '',
+    rank: 6,
     fridays: [
       { label: fridayLabels[0], validated: true, value: 66, score: '66' },
       { label: fridayLabels[1], validated: false, value: null },

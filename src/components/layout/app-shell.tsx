@@ -8,6 +8,7 @@ import {
   UserIcon,
 } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -132,54 +133,58 @@ export function AppShell() {
 
           <NavLinks className="hidden md:flex" />
 
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-auto gap-2 rounded-full py-1 pl-1 pr-2 sm:pr-3"
-                >
-                  <Avatar size="sm">
-                    <AvatarImage src={user.avatarUrl} alt={user.login} />
-                    <AvatarFallback>{initials}</AvatarFallback>
-                  </Avatar>
-                  <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">
-                    {user.login}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium">{user.displayName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      @{user.login}
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-auto gap-2 rounded-full py-1 pl-1 pr-2 sm:pr-3"
+                  >
+                    <Avatar size="sm">
+                      <AvatarImage src={user.avatarUrl} alt={user.login} />
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">
+                      {user.login}
                     </span>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem asChild>
-                    <Link to="/profile">
-                      <UserIcon />
-                      Profile
-                    </Link>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium">{user.displayName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        @{user.login}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile">
+                        <UserIcon />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/leaderboard">
+                        <TrophyIcon />
+                        Leaderboard
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                    <LogOutIcon />
+                    Log out
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/leaderboard">
-                      <TrophyIcon />
-                      Leaderboard
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
-                  <LogOutIcon />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </header>
 

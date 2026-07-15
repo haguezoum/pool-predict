@@ -1,7 +1,16 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { CheckIcon, Maximize2Icon, XIcon } from 'lucide-react'
+import {
+  ArrowDownAZIcon,
+  ArrowDownNarrowWideIcon,
+  ArrowUpAZIcon,
+  ArrowUpNarrowWideIcon,
+  CheckIcon,
+  Maximize2Icon,
+  SearchIcon,
+  XIcon,
+} from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
 import { matches } from '@/lib/mock-data'
 import type { Match } from '@/types'
@@ -14,9 +23,31 @@ import {
   CardContent,
   CardFooter,
 } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+
+type SortKey = 'rank-asc' | 'rank-desc' | 'login-asc' | 'login-desc'
+
+const SORT_OPTIONS: {
+  value: SortKey
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+}[] = [
+  { value: 'rank-asc', label: 'Rank · best first', icon: ArrowUpNarrowWideIcon },
+  { value: 'rank-desc', label: 'Rank · worst first', icon: ArrowDownNarrowWideIcon },
+  { value: 'login-asc', label: 'Login · A–Z', icon: ArrowDownAZIcon },
+  { value: 'login-desc', label: 'Login · Z–A', icon: ArrowUpAZIcon },
+]
 
 type Decision = 'validate' | 'not-validate' | null
 
@@ -180,6 +211,39 @@ function MatchCard({ match }: { match: Match }) {
 
 export function HomePage() {
   const { user } = useAuth()
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<SortKey>('rank-asc')
+
+  const filteredMatches = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const filtered = q
+      ? matches.filter(
+          (m) =>
+            m.login.toLowerCase().includes(q) ||
+            m.fullName.toLowerCase().includes(q)
+        )
+      : [...matches]
+
+    filtered.sort((a, b) => {
+      switch (sort) {
+        case 'rank-asc':
+          return a.rank - b.rank
+        case 'rank-desc':
+          return b.rank - a.rank
+        case 'login-asc':
+          return a.login.localeCompare(b.login)
+        case 'login-desc':
+          return b.login.localeCompare(a.login)
+        default:
+          return 0
+      }
+    })
+
+    return filtered
+  }, [query, sort])
+
+  const activeSort = SORT_OPTIONS.find((o) => o.value === sort) ?? SORT_OPTIONS[0]
+  const SortIcon = activeSort.icon
 
   return (
     <div className="flex flex-col gap-8">
@@ -208,17 +272,77 @@ export function HomePage() {
       </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">Players</h2>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {matches.length} total
-          </span>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-2 sm:justify-start">
+            <h2 className="text-lg font-semibold tracking-tight">Players</h2>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {filteredMatches.length}
+              {query.trim() ? ` of ${matches.length}` : ' total'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search login or name…"
+                className="h-9 pl-8"
+                aria-label="Search players"
+              />
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0 gap-1.5"
+                  aria-label={`Sort: ${activeSort.label}`}
+                >
+                  <SortIcon className="size-4" />
+                  <span className="hidden sm:inline">Sort</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup
+                  value={sort}
+                  onValueChange={(v) => setSort(v as SortKey)}
+                >
+                  {SORT_OPTIONS.map((option) => {
+                    const Icon = option.icon
+                    return (
+                      <DropdownMenuRadioItem
+                        key={option.value}
+                        value={option.value}
+                      >
+                        <Icon className="size-4 text-muted-foreground" />
+                        {option.label}
+                      </DropdownMenuRadioItem>
+                    )
+                  })}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {matches.map((match) => (
-            <MatchCard key={match.id} match={match} />
-          ))}
-        </div>
+
+        {filteredMatches.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+            No players match “{query.trim()}”.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredMatches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

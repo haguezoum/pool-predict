@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '@/context/auth-context'
+import { ThemeProvider } from '@/context/theme-context'
 import { AppShell } from '@/components/layout/app-shell'
 import { ProtectedRoute } from '@/components/layout/protected-route'
 import { HomePage } from '@/pages/home-page'
@@ -9,20 +10,22 @@ import { ProfilePage } from '@/pages/profile-page'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<AppShell />}>
-              <Route index element={<HomePage />} />
-              <Route path="leaderboard" element={<LeaderboardPage />} />
-              <Route path="profile" element={<ProfilePage />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppShell />}>
+                <Route index element={<HomePage />} />
+                <Route path="leaderboard" element={<LeaderboardPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

@@ -1,5 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
+import { FortyTwoLogo } from '@/components/icons/forty-two-logo'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -8,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { FortyTwoLogo } from '@/components/icons/forty-two-logo'
 
 export function LoginPage() {
   const { isAuthenticated, loginWith42 } = useAuth()
@@ -22,11 +23,11 @@ export function LoginPage() {
       {/* Atmosphere — logo navy + electric blue */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,oklch(0.45_0.14_241_/_0.35),transparent)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,oklch(0.55_0.14_241_/_0.18),transparent)] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,oklch(0.45_0.14_241_/_0.35),transparent)]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,oklch(0.30_0.08_258_/_0.35),transparent_50%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,oklch(0.45_0.08_258_/_0.12),transparent_50%)] dark:bg-[radial-gradient(circle_at_80%_80%,oklch(0.30_0.08_258_/_0.35),transparent_50%)]"
       />
       <div
         aria-hidden
@@ -35,6 +36,10 @@ export function LoginPage() {
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
         }}
       />
+
+      <div className="absolute top-4 right-4 z-20 sm:top-6 sm:right-6">
+        <ThemeToggle />
+      </div>
 
       <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
@@ -69,7 +74,7 @@ export function LoginPage() {
               onClick={loginWith42}
             >
               <FortyTwoLogo data-icon="inline-start" className="size-5" />
-              Continue with 42 Network
+              Sign in and continue
             </Button>
           </CardContent>
         </Card>
