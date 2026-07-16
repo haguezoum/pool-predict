@@ -8,11 +8,11 @@ Private Exam 00–03 prediction platform for the 1337 MED Tetouan Piscine. The 4
 - Correct validation outcome with another score: **+1**
 - Correct not-validated prediction: **+1**
 - Wrong validation outcome: **-1**
-- No predictions at all before an eligible exam locks: one **-2**
+- No predictions at all before an eligible exam locks: one **-2**, settled after the pool closes
 - Unpredicted individual poolers: **0**
 - Equal totals receive the same SQL `rank()`
 
-The first successful login enrolls a student in the current pool. Missed-exam penalties apply only to exams that lock after enrollment, never retroactively. Predictions remain private until the exam lock.
+The first successful login enrolls a student in the current pool. Missed-exam penalties apply only after the pool closes and only to exams that lock after enrollment, never retroactively. Players without a settled score remain unranked. Predictions remain private until the exam lock.
 
 ## Architecture
 

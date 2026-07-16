@@ -68,10 +68,25 @@ describe('Repository', () => {
 
     const query = execute.mock.calls[0]?.[0]
     const compiled = compiledSql(query)
+    expect(compiled).toContain('delete from pool_predict.leaderboard_totals lt')
+    expect(compiled).toContain('join pool_predict.score_events se')
     expect(compiled).toContain('rank() over (order by total_score desc)::integer as rank')
   })
 
-  it('waits until an exam ends before applying no-bet penalties', async () => {
+  it('keeps users without a settled score unranked', async () => {
+    const execute = vi.fn().mockResolvedValue([])
+    const repository = new Repository({ execute } as unknown as Database)
+
+    const stats = await repository.getUserStats(
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002'
+    )
+
+    expect(stats.total_score).toBe(0)
+    expect(stats.rank).toBe(0)
+  })
+
+  it('waits until the pool ends before applying no-bet penalties', async () => {
     const execute = vi.fn().mockResolvedValue([])
     const repository = new Repository({ execute } as unknown as Database)
 
@@ -81,9 +96,9 @@ describe('Repository', () => {
     const cleanup = compiledSql(execute.mock.calls[0]?.[0])
     const insert = compiledSql(execute.mock.calls[1]?.[0])
     expect(cleanup).toContain("delete from pool_predict.score_events")
-    expect(cleanup).toContain("coalesce(e.ends_at, e.lock_at) > now()")
+    expect(cleanup).toContain("p.ends_at > now()")
     expect(cleanup).toContain("exists ( select 1 from pool_predict.bets")
-    expect(insert).toContain("coalesce(e.ends_at, e.lock_at) <= now()")
+    expect(insert).toContain("p.ends_at <= now()")
     expect(insert).toContain("m.enrolled_at < e.lock_at")
     expect(insert).toContain("on conflict (source_key) do nothing")
   })

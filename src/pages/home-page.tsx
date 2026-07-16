@@ -490,7 +490,9 @@ export function HomePage() {
         <div className="flex flex-wrap items-end gap-8 sm:gap-12">
           <p className="flex flex-col gap-0.5">
             <span className="text-xs text-muted-foreground">Your Rank</span>
-            <span className="font-display text-5xl leading-none text-blue-500 sm:text-6xl">#{user?.rank}</span>
+            <span className="font-display text-5xl leading-none text-blue-500 sm:text-6xl">
+              {user?.rank ? `#${user.rank}` : '—'}
+            </span>
           </p>
           <p className="flex flex-col gap-0.5">
             <span className="text-xs text-muted-foreground">Total score</span>

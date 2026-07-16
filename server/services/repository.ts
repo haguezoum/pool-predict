@@ -322,14 +322,15 @@ export class Repository {
   async applyNoBetPenalties(poolId: string) {
     await this.db.execute(sql`
       delete from pool_predict.score_events se
-      using pool_predict.exam_refs e, pool_predict.pool_memberships m
+      using pool_predict.exam_refs e, pool_predict.pool_memberships m, pool_predict.pool_refs p
       where se.pool_id = ${poolId}::uuid
         and se.type = 'no_bet'::pool_predict.score_event_type
         and se.exam_id = e.id
+        and p.id = e.pool_id
         and m.pool_id = e.pool_id
         and m.user_id = se.user_id
         and (
-          coalesce(e.ends_at, e.lock_at) > now()
+          p.ends_at > now()
           or m.enrolled_at >= e.lock_at
           or exists (
             select 1 from pool_predict.bets b
@@ -350,8 +351,9 @@ export class Repository {
         'no-bet:' || e.id::text || ':' || m.user_id::text
       from pool_predict.exam_refs e
       join pool_predict.pool_memberships m on m.pool_id = e.pool_id
+      join pool_predict.pool_refs p on p.id = e.pool_id
       where e.pool_id = ${poolId}::uuid
-        and coalesce(e.ends_at, e.lock_at) <= now()
+        and p.ends_at <= now()
         and m.enrolled_at < e.lock_at
         and not exists (
           select 1 from pool_predict.bets b
@@ -393,13 +395,20 @@ export class Repository {
 
   async rebuildLeaderboard(poolId: string) {
     await this.db.execute(sql`
-      with totals as (
+      with pruned as (
+        delete from pool_predict.leaderboard_totals lt
+        where lt.pool_id = ${poolId}::uuid
+          and not exists (
+            select 1 from pool_predict.score_events se
+            where se.pool_id = lt.pool_id and se.user_id = lt.user_id
+          )
+      ), totals as (
         select
           m.pool_id,
           m.user_id,
-          coalesce(sum(se.points), 0)::integer as total_score
+          sum(se.points)::integer as total_score
         from pool_predict.pool_memberships m
-        left join pool_predict.score_events se
+        join pool_predict.score_events se
           on se.pool_id = m.pool_id and se.user_id = m.user_id
         where m.pool_id = ${poolId}::uuid
         group by m.pool_id, m.user_id
@@ -450,7 +459,7 @@ export class Repository {
     return (
       rows[0] ?? {
         total_score: 0,
-        rank: 1,
+        rank: 0,
         predictions: 0,
         correct: 0,
         wrong: 0,
