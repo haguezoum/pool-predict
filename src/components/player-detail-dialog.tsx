@@ -75,21 +75,27 @@ export function PlayerDetailDialog({ match, poolId, open, onOpenChange }: Player
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
           >
             <header className="relative border-b px-4 py-4 sm:px-6">
-              <div className="flex items-center gap-3 pr-10">
-                <Avatar className="size-12 sm:size-14">
+              <a
+                href={`https://profile.intra.42.fr/users/${encodeURIComponent(match.login)}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open @${match.login}'s 42 profile in a new tab`}
+                className="group flex w-fit items-center gap-3 rounded-lg pr-10 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Avatar className="size-12 transition-transform group-hover:scale-105 sm:size-14">
                   <AvatarImage src={match.avatarUrl} alt={match.login} />
                   <AvatarFallback>{initials(match.fullName)}</AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
-                  <h2
+                <span className="min-w-0">
+                  <span
                     id={`player-dialog-title-${match.id}`}
-                    className="truncate text-lg font-semibold tracking-tight"
+                    className="block truncate text-lg font-semibold tracking-tight group-hover:underline"
                   >
                     @{match.login}
-                  </h2>
-                  <p className="truncate text-sm text-muted-foreground">{match.fullName}</p>
-                </div>
-              </div>
+                  </span>
+                  <span className="block truncate text-sm text-muted-foreground">{match.fullName}</span>
+                </span>
+              </a>
               <Button
                 type="button"
                 variant="ghost"
