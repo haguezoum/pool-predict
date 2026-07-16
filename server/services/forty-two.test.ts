@@ -4,6 +4,7 @@ import {
   isEligibleUser,
   selectActiveCohort,
   type FortyTwoUser,
+  type LivePoolSnapshot,
 } from './forty-two.js'
 import type { Env, UserKind } from '../env.js'
 
@@ -190,5 +191,97 @@ describe('42 pool discovery', () => {
       String(input).includes('/v2/cursus/9/cursus_users')
     )
     expect(rosterRequests).toHaveLength(1)
+  })
+})
+
+describe('42 Piscine project results', () => {
+  it('returns current-cohort non-exam project scores grouped by Piscine week', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/oauth/token') {
+        return Response.json({ access_token: 'app-token', expires_in: 7_200 })
+      }
+      if (url.pathname === '/v2/users/42/projects_users') {
+        return Response.json([
+          {
+            id: 1,
+            final_mark: 99,
+            'validated?': true,
+            created_at: '2025-01-07T10:00:00.000Z',
+            marked_at: '2025-01-08T10:00:00.000Z',
+            updated_at: '2025-01-08T10:00:00.000Z',
+            project: { id: 100, name: 'C Piscine C 00' },
+            user: { id: 42, login: 'pooler' },
+          },
+          {
+            id: 2,
+            final_mark: 80,
+            'validated?': true,
+            created_at: '2026-07-07T10:00:00.000Z',
+            marked_at: '2026-07-09T10:00:00.000Z',
+            updated_at: '2026-07-09T10:00:00.000Z',
+            project: { id: 100, name: 'C Piscine C 00' },
+            user: { id: 42, login: 'pooler' },
+          },
+          {
+            id: 3,
+            final_mark: 60,
+            'validated?': true,
+            created_at: '2026-07-14T10:00:00.000Z',
+            marked_at: '2026-07-16T10:00:00.000Z',
+            updated_at: '2026-07-16T10:00:00.000Z',
+            project: { id: 101, name: 'C Piscine C 01' },
+            user: { id: 42, login: 'pooler' },
+          },
+          {
+            id: 4,
+            final_mark: 100,
+            'validated?': true,
+            created_at: '2026-07-14T10:00:00.000Z',
+            marked_at: '2026-07-16T10:00:00.000Z',
+            updated_at: '2026-07-16T10:00:00.000Z',
+            project: { id: 999, name: 'Exam 01' },
+            user: { id: 42, login: 'pooler' },
+          },
+        ])
+      }
+      return new Response('Unexpected 42 request', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const env: Env = {
+      nodeEnv: 'test',
+      appOrigin: 'http://localhost:5173',
+      apiPort: 3001,
+      clientId: 'client',
+      clientSecret: 'secret',
+      redirectUri: 'http://localhost:5173/api/auth/42/callback',
+      campusId: 55,
+      allowedKinds: ['admin', 'student', 'external'],
+      allowedCampusIds: [],
+      allowPoolers: false,
+      databaseUrl: 'postgres://unused',
+      databaseRole: 'pool_predict_api',
+      sessionSecret: 'test-session-secret-long-enough',
+    }
+    const snapshot: LivePoolSnapshot = {
+      externalRef: 'piscine-c:55:2026-07-06',
+      campusId: 55,
+      cursusId: 9,
+      startsAt: new Date('2026-07-06T08:30:00.000Z'),
+      endsAt: new Date('2026-08-03T08:30:00.000Z'),
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      exams: [],
+      projects: [
+        { id: 100, name: 'C Piscine C 00', position: 1 },
+        { id: 101, name: 'C Piscine C 01', position: 2 },
+      ],
+    }
+
+    const results = await new FortyTwoClient(env).getPoolerProjectResults(snapshot, 42)
+
+    expect(results).toEqual([
+      { projectId: 100, name: 'C Piscine C 00', validated: true, score: 80, week: 0 },
+      { projectId: 101, name: 'C Piscine C 01', validated: true, score: 60, week: 1 },
+    ])
   })
 })

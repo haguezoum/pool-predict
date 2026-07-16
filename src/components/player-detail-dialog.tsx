@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { CheckIcon, XIcon } from 'lucide-react'
 import type { Match } from '@/types'
+import { api } from '@/lib/api'
 import { FridayLineChart } from '@/components/friday-line-chart'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -19,11 +21,19 @@ function initials(name: string) {
 
 type PlayerDetailDialogProps = {
   match: Match
+  poolId: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function PlayerDetailDialog({ match, open, onOpenChange }: PlayerDetailDialogProps) {
+export function PlayerDetailDialog({ match, poolId, open, onOpenChange }: PlayerDetailDialogProps) {
+  const projectsQuery = useQuery({
+    queryKey: ['pooler-projects', poolId, match.intraUserId],
+    queryFn: () => api.poolerProjects(poolId, match.intraUserId),
+    enabled: open,
+    staleTime: 5 * 60_000,
+  })
+
   useEffect(() => {
     if (!open) return
     const previousOverflow = document.body.style.overflow
@@ -95,13 +105,25 @@ export function PlayerDetailDialog({ match, open, onOpenChange }: PlayerDetailDi
             <div className="overflow-y-auto px-4 py-5 sm:px-6">
               <section className="flex flex-col gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold tracking-tight">Exam 00–03 results</h3>
+                  <h3 className="text-sm font-semibold tracking-tight">Pool progress</h3>
                   <p className="text-xs text-muted-foreground">
-                    Loaded live from 42. Results are never copied into the app database.
+                    Exam and project scores are loaded live from 42 and never copied into the app database.
                   </p>
                 </div>
                 <div className="rounded-xl border border-border p-2 sm:p-3">
-                  <FridayLineChart fridays={match.fridays} login={match.login} />
+                  <FridayLineChart
+                    fridays={match.fridays}
+                    login={match.login}
+                    projectResults={projectsQuery.data}
+                    showSeriesControls
+                    projectStatus={
+                      projectsQuery.isFetching
+                        ? 'loading'
+                        : projectsQuery.isError
+                          ? 'error'
+                          : 'idle'
+                    }
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {match.results.map((result) => (

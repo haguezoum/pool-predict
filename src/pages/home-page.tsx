@@ -74,12 +74,13 @@ function RevealedPredictions({ exam, poolerIntraId }: { exam: ExamView; poolerIn
 
 type MatchCardProps = {
   match: Match
+  poolId: string
   exam: ExamView
   bet: BetView | undefined
   sourceAvailable: boolean
 }
 
-function MatchCard({ match, exam, bet, sourceAvailable }: MatchCardProps) {
+function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps) {
   const queryClient = useQueryClient()
   const [decision, setDecision] = useState<'validate' | 'not_validate' | null>(
     bet?.prediction ?? null
@@ -232,7 +233,12 @@ function MatchCard({ match, exam, bet, sourceAvailable }: MatchCardProps) {
         </Card>
       </motion.div>
 
-      <PlayerDetailDialog match={match} open={expanded} onOpenChange={setExpanded} />
+      <PlayerDetailDialog
+        match={match}
+        poolId={poolId}
+        open={expanded}
+        onOpenChange={setExpanded}
+      />
     </>
   )
 }
@@ -403,6 +409,7 @@ export function HomePage() {
                   <MatchCard
                     key={`${selectedExam.id}-${match.id}`}
                     match={match}
+                    poolId={pool.id}
                     exam={selectedExam}
                     bet={betsByPooler.get(match.intraUserId)}
                     sourceAvailable={pool.sourceAvailable}

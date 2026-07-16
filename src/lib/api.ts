@@ -6,6 +6,7 @@ import type {
   PoolSummary,
   PoolerView,
   PoolView,
+  ProjectResultView,
   RevealedBetView,
   Viewer,
 } from '@shared/contracts'
@@ -58,6 +59,10 @@ export const api = {
   pools: () => request<PoolSummary[]>('/api/pools'),
   pool: (poolId: string) => request<PoolView>(`/api/pools/${poolId}`),
   poolers: (poolId: string) => request<PoolerView[]>(`/api/pools/${poolId}/poolers`),
+  poolerProjects: (poolId: string, poolerIntraId: number) =>
+    request<ProjectResultView[]>(
+      `/api/pools/${poolId}/poolers/${poolerIntraId}/projects`
+    ),
   myBets: (poolId: string) =>
     request<BetView[]>(`/api/bets/mine?poolId=${encodeURIComponent(poolId)}`),
   saveBet: (examId: string, poolerIntraId: number, input: BetInput) =>

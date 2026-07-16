@@ -419,6 +419,22 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
   )
 
   app.get(
+    '/api/pools/:poolId/poolers/:pooler42Id/projects',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const poolerIntraId = z.coerce.number().int().positive().parse(routeParam(req, 'pooler42Id'))
+      const synced = await syncPool(repository, fortyTwo)
+      if (synced.pool.id !== routeParam(req, 'poolId')) {
+        throw new ApiError(409, 'LIVE_DATA_CURRENT_POOL_ONLY', 'Live project data is available for the current pool')
+      }
+      if (!synced.snapshot.poolers.some((pooler) => pooler.intraUserId === poolerIntraId)) {
+        throw new ApiError(422, 'INVALID_POOLER', 'This user is not a pooler in the current pool')
+      }
+      res.json(await fortyTwo.getPoolerProjectResults(synced.snapshot, poolerIntraId))
+    })
+  )
+
+  app.get(
     '/api/bets/mine',
     requireAuth,
     asyncHandler(async (req, res) => {

@@ -130,6 +130,7 @@ describe('Express API boundary', () => {
       startsAt: new Date(now - 7 * 24 * 60 * 60 * 1_000),
       endsAt: new Date(now + 21 * 24 * 60 * 60 * 1_000),
       poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      projects: [],
       exams: [
         {
           code: '00',
@@ -172,6 +173,41 @@ describe('Express API boundary', () => {
       { code: '00', validated: true, score: 80 },
       { code: '01', validated: null, score: null },
     ])
+  })
+
+  it('loads a pooler project history only from the live 42 source', async () => {
+    const user = { id: 'user-id', intraUserId: 7 }
+    const snapshot: LivePoolSnapshot = {
+      externalRef: 'piscine-c:55:2026-07-06',
+      campusId: 55,
+      cursusId: 9,
+      startsAt: new Date('2026-07-06T08:30:00.000Z'),
+      endsAt: new Date('2026-08-03T08:30:00.000Z'),
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      exams: [],
+      projects: [{ id: 100, name: 'C Piscine C 00', position: 1 }],
+    }
+    const projectResults = [
+      { projectId: 100, name: 'C Piscine C 00', validated: true, score: 75, week: 0 },
+    ]
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({ user }),
+      upsertPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [] }),
+    } as unknown as Repository
+    const fortyTwo = {
+      getCurrentPool: vi.fn().mockResolvedValue(snapshot),
+      getPoolerProjectResults: vi.fn().mockResolvedValue(projectResults),
+    } as unknown as FortyTwoClient
+    const app = createApp({ env, repository, fortyTwo })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/pools/pool-id/poolers/42/projects')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual(projectResults)
+    expect(fortyTwo.getPoolerProjectResults).toHaveBeenCalledWith(snapshot, 42)
   })
 
   it('rejects cross-origin state-changing requests', async () => {

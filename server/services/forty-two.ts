@@ -4,6 +4,7 @@ import { getEnv, USER_KINDS, type Env, type UserKind } from '../env.js'
 const API_ORIGIN = 'https://api.intra.42.fr'
 const PAGE_SIZE = 100
 const PISCINE_DURATION_MS = 28 * 24 * 60 * 60 * 1000
+const PISCINE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
 const EXAM_DURATION_MS = 4 * 60 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 12_000
 const POOL_DISCOVERY_TIMEOUT_MS = 30_000
@@ -66,6 +67,9 @@ type FortyTwoProject = {
   id: number
   name: string
   slug?: string
+  position?: number | null
+  exam?: boolean
+  has_mark?: boolean
 }
 
 type ProjectUser = {
@@ -73,7 +77,11 @@ type ProjectUser = {
   final_mark: number | null
   status?: string
   'validated?'?: boolean | null
+  created_at?: string
+  marked_at?: string | null
   updated_at?: string
+  cursus_ids?: number[]
+  project?: { id: number; name: string; slug?: string }
   user: { id: number; login: string }
 }
 
@@ -92,6 +100,12 @@ export type LiveExam = {
   endsAt: Date
 }
 
+export type LiveProject = {
+  id: number
+  name: string
+  position: number
+}
+
 export type LivePoolSnapshot = {
   externalRef: string
   campusId: number
@@ -100,11 +114,20 @@ export type LivePoolSnapshot = {
   endsAt: Date
   poolers: LivePooler[]
   exams: LiveExam[]
+  projects: LiveProject[]
 }
 
 export type LiveResult = {
   validated: boolean
   score: number | null
+}
+
+export type LiveProjectResult = {
+  projectId: number
+  name: string
+  validated: boolean | null
+  score: number | null
+  week: number
 }
 
 export class FortyTwoUnavailableError extends Error {
@@ -481,7 +504,7 @@ export class FortyTwoClient {
         .then((rows) => [...new Map(rows.map((exam) => [exam.id, exam])).values()])
         .catch(() => []),
       this.paginate<FortyTwoProject>(
-        `/v2/cursus/${piscine.id}/projects?sort=-id`
+        `/v2/cursus/${piscine.id}/projects?sort=position`
       ).catch(() => []),
     ])
     const detailById = new Map(detailedUsers.map((user) => [user.id, user]))
@@ -526,6 +549,25 @@ export class FortyTwoClient {
           : new Date(lockAt.getTime() + EXAM_DURATION_MS),
       }
     })
+    const examProjectIds = new Set(
+      exams
+        .map((exam) => exam.externalProjectId)
+        .filter((id): id is number => id !== null)
+    )
+    const poolProjects = projects
+      .filter(
+        (project) =>
+          project.exam !== true &&
+          project.has_mark !== false &&
+          !examProjectIds.has(project.id) &&
+          !examCodeFromName(project.name)
+      )
+      .map((project, index) => ({
+        id: project.id,
+        name: project.name,
+        position: project.position ?? index,
+      }))
+      .toSorted((left, right) => left.position - right.position || left.id - right.id)
 
     const snapshot = {
       externalRef: `piscine-c:${campusId}:${cohort.key}`,
@@ -535,6 +577,7 @@ export class FortyTwoClient {
       endsAt: cohort.endsAt,
       poolers,
       exams,
+      projects: poolProjects,
     }
     this.poolCache = { value: snapshot, expiresAt: Date.now() + POOL_CACHE_MS }
     return snapshot
@@ -557,6 +600,60 @@ export class FortyTwoClient {
       })
     }
     return results
+  }
+
+  async getPoolerProjectResults(
+    snapshot: LivePoolSnapshot,
+    poolerIntraId: number
+  ): Promise<LiveProjectResult[]> {
+    if (!snapshot.poolers.some((pooler) => pooler.intraUserId === poolerIntraId)) {
+      return []
+    }
+
+    const rows = await this.paginate<ProjectUser>(
+      `/v2/users/${poolerIntraId}/projects_users?filter%5Bcursus%5D=${snapshot.cursusId}&sort=updated_at`
+    )
+    const projectById = new Map(snapshot.projects.map((project) => [project.id, project]))
+    const latestByProject = new Map<number, ProjectUser>()
+    const earliestAttempt = snapshot.startsAt.getTime() - 24 * 60 * 60 * 1_000
+    const latestAttempt = snapshot.endsAt.getTime() + 14 * 24 * 60 * 60 * 1_000
+
+    for (const row of rows) {
+      const projectId = row.project?.id
+      if (!projectId || !projectById.has(projectId)) continue
+      const attemptAt = new Date(row.created_at ?? row.updated_at ?? '').getTime()
+      if (!Number.isFinite(attemptAt) || attemptAt < earliestAttempt || attemptAt > latestAttempt) {
+        continue
+      }
+      const previous = latestByProject.get(projectId)
+      const previousUpdatedAt = new Date(previous?.updated_at ?? previous?.created_at ?? '').getTime()
+      const updatedAt = new Date(row.updated_at ?? row.created_at ?? '').getTime()
+      if (!previous || updatedAt >= previousUpdatedAt) latestByProject.set(projectId, row)
+    }
+
+    return snapshot.projects.flatMap((project) => {
+      const row = latestByProject.get(project.id)
+      if (!row) return []
+      const evaluatedAt = new Date(
+        row.marked_at ?? row.updated_at ?? row.created_at ?? snapshot.startsAt
+      ).getTime()
+      const week = Math.min(
+        3,
+        Math.max(0, Math.floor((evaluatedAt - snapshot.startsAt.getTime()) / PISCINE_WEEK_MS))
+      )
+      const explicitlySettled = typeof row['validated?'] === 'boolean'
+      return [{
+        projectId: project.id,
+        name: project.name,
+        validated: explicitlySettled
+          ? row['validated?'] ?? null
+          : row.final_mark === null
+            ? null
+            : row.final_mark >= 50,
+        score: row.final_mark,
+        week,
+      }]
+    })
   }
 }
 

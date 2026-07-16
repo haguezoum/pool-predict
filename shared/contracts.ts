@@ -59,6 +59,14 @@ export type PoolerView = {
   results: ExamResultView[]
 }
 
+export type ProjectResultView = {
+  projectId: number
+  name: string
+  validated: boolean | null
+  score: number | null
+  week: number
+}
+
 export type BetView = {
   id: string
   examId: string
