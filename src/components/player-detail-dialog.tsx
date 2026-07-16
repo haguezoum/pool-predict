@@ -94,6 +94,9 @@ export function PlayerDetailDialog({ match, poolId, open, onOpenChange }: Player
                     @{match.login}
                   </span>
                   <span className="block truncate text-sm text-muted-foreground">{match.fullName}</span>
+                  <span className="block text-xs font-medium tabular-nums text-primary">
+                    Lvl {match.level?.toFixed(2) ?? '—'}
+                  </span>
                 </span>
               </a>
               <Button

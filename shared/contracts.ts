@@ -56,6 +56,7 @@ export type PoolerView = {
   login: string
   displayName: string
   avatarUrl: string
+  level: number | null
   results: ExamResultView[]
 }
 

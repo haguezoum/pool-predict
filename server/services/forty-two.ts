@@ -51,6 +51,7 @@ type CursusUser = {
   id: number
   begin_at: string
   end_at: string | null
+  level?: number | null
   user: { id: number; login: string; url?: string }
 }
 
@@ -90,6 +91,7 @@ export type LivePooler = {
   login: string
   displayName: string
   avatarUrl: string
+  level: number | null
 }
 
 export type LiveExam = {
@@ -515,6 +517,7 @@ export class FortyTwoClient {
         login: detail?.login ?? row.user.login,
         displayName: detail ? displayName(detail) : row.user.login,
         avatarUrl: detail ? avatarUrl(detail) : '',
+        level: typeof row.level === 'number' ? row.level : null,
       }
     })
 

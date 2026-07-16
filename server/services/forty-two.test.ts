@@ -144,6 +144,7 @@ describe('42 pool discovery', () => {
             id: 1,
             begin_at: beginAt,
             end_at: null,
+            level: 3.14,
             user: { id: 42, login: 'pooler' },
           },
         ])
@@ -187,6 +188,7 @@ describe('42 pool discovery', () => {
 
     expect(first).toBe(second)
     expect(first.poolers).toHaveLength(1)
+    expect(first.poolers[0]?.level).toBe(3.14)
     const rosterRequests = fetchMock.mock.calls.filter(([input]) =>
       String(input).includes('/v2/cursus/9/cursus_users')
     )
@@ -269,7 +271,7 @@ describe('42 Piscine project results', () => {
       cursusId: 9,
       startsAt: new Date('2026-07-06T08:30:00.000Z'),
       endsAt: new Date('2026-08-03T08:30:00.000Z'),
-      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '', level: 4.2 }],
       exams: [],
       projects: [
         { id: 100, name: 'C Piscine C 00', position: 1 },

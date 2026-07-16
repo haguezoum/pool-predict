@@ -29,6 +29,7 @@ export type Match = {
   login: string
   fullName: string
   avatarUrl: string
+  level: number | null
   rank: number
   fridays: FridayResult[]
   results: ExamResultView[]

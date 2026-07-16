@@ -156,6 +156,9 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-semibold tracking-tight">@{match.login}</p>
                 <p className="truncate text-sm text-muted-foreground">{match.fullName}</p>
+                <p className="mt-0.5 text-xs font-medium tabular-nums text-primary">
+                  Lvl {match.level?.toFixed(2) ?? '—'}
+                </p>
               </div>
             </div>
 
@@ -255,6 +258,7 @@ export function HomePage() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'poolers' | 'predictions'>('poolers')
   const [query, setQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'login' | 'level-desc' | 'level-asc'>('login')
   const [selectedCode, setSelectedCode] = useState<ExamCode>('00')
 
   const poolQuery = useQuery({ queryKey: ['pool', 'current'], queryFn: api.currentPool })
@@ -287,6 +291,7 @@ export function HomePage() {
       login: pooler.login,
       fullName: pooler.displayName,
       avatarUrl: pooler.avatarUrl,
+      level: pooler.level,
       rank: index + 1,
       results: pooler.results,
       fridays: pooler.results.map((result) => ({
@@ -300,15 +305,21 @@ export function HomePage() {
 
   const filteredMatches = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    return matches
-      .filter(
-        (match) =>
-          !normalized ||
-          match.login.toLowerCase().includes(normalized) ||
-          match.fullName.toLowerCase().includes(normalized)
-      )
-      .toSorted((left, right) => left.login.localeCompare(right.login))
-  }, [matches, query])
+    const filtered = matches.filter(
+      (match) =>
+        !normalized ||
+        match.login.toLowerCase().includes(normalized) ||
+        match.fullName.toLowerCase().includes(normalized)
+    )
+    return filtered.toSorted((left, right) => {
+      const loginOrder = left.login.localeCompare(right.login)
+      if (sortBy === 'login') return loginOrder
+      if (left.level === null) return right.level === null ? loginOrder : 1
+      if (right.level === null) return -1
+      const levelOrder = left.level - right.level
+      return (sortBy === 'level-asc' ? levelOrder : -levelOrder) || loginOrder
+    })
+  }, [matches, query, sortBy])
 
   if (poolQuery.isPending) {
     return (
@@ -418,15 +429,28 @@ export function HomePage() {
                 <h2 className="text-lg font-semibold tracking-tight">Poolers</h2>
                 <span className="text-xs text-muted-foreground">{filteredMatches.length} total</span>
               </div>
-              <div className="relative sm:w-64">
-                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search login or name…"
-                  className="h-9 pl-8"
-                />
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <label htmlFor="pooler-sort" className="sr-only">Sort poolers</label>
+                <select
+                  id="pooler-sort"
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="login">Login A–Z</option>
+                  <option value="level-desc">Level high–low</option>
+                  <option value="level-asc">Level low–high</option>
+                </select>
+                <div className="relative sm:w-64">
+                  <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search login or name…"
+                    className="h-9 pl-8"
+                  />
+                </div>
               </div>
             </div>
 

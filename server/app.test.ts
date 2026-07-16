@@ -129,7 +129,7 @@ describe('Express API boundary', () => {
       cursusId: 9,
       startsAt: new Date(now - 7 * 24 * 60 * 60 * 1_000),
       endsAt: new Date(now + 21 * 24 * 60 * 60 * 1_000),
-      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '', level: 4.2 }],
       projects: [],
       exams: [
         {
@@ -169,6 +169,7 @@ describe('Express API boundary', () => {
     expect(response.status).toBe(200)
     expect(getExamResults).toHaveBeenCalledOnce()
     expect(getExamResults).toHaveBeenCalledWith(snapshot, snapshot.exams[0])
+    expect(response.body[0].level).toBe(4.2)
     expect(response.body[0].results).toEqual([
       { code: '00', validated: true, score: 80 },
       { code: '01', validated: null, score: null },
@@ -183,7 +184,7 @@ describe('Express API boundary', () => {
       cursusId: 9,
       startsAt: new Date('2026-07-06T08:30:00.000Z'),
       endsAt: new Date('2026-08-03T08:30:00.000Z'),
-      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '' }],
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '', level: 4.2 }],
       exams: [],
       projects: [{ id: 100, name: 'C Piscine C 00', position: 1 }],
     }
