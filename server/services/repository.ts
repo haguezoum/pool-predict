@@ -448,8 +448,8 @@ export class Repository {
       left join pool_predict.score_events se
         on se.pool_id = lt.pool_id and se.user_id = lt.user_id
       where lt.pool_id = ${poolId}::uuid
-      group by lt.user_id, u.intra_user_id, lt.total_score, lt.rank
-      order by lt.rank asc, u.intra_user_id asc
+      group by lt.user_id, u.intra_user_id, u.created_at, lt.total_score, lt.rank
+      order by lt.total_score desc, u.created_at asc, u.intra_user_id asc
     `)
   }
 

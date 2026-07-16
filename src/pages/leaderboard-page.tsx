@@ -71,7 +71,7 @@ export function LeaderboardPage() {
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            {selectedPool?.status === 'closed' ? 'Archived pool' : 'Current pool'} · shared ranks depend only on total score.
+            {selectedPool?.status === 'closed' ? 'Archived pool' : 'Current pool'} · players are ranked by score; ties show the earliest sign-in first.
           </p>
         </div>
         {(poolQuery.data?.length ?? 0) > 1 ? (
@@ -158,7 +158,7 @@ export function LeaderboardPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">Rank</TableHead>
-              <TableHead>Student</TableHead>
+              <TableHead>Player</TableHead>
               <TableHead className="text-right">Predictions</TableHead>
               <TableHead className="text-right">Exact</TableHead>
               <TableHead className="text-right">Missed exams</TableHead>
