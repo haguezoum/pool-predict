@@ -52,7 +52,7 @@ describe('Repository', () => {
     expect(compiled).toContain('and m.campus_id = e.campus_id')
   })
 
-  it('orders leaderboard users by score then first sign-in', async () => {
+  it('includes unranked pool members after ranked users', async () => {
     const execute = vi.fn().mockResolvedValue([])
     const repository = new Repository({ execute } as unknown as Database)
 
@@ -60,10 +60,13 @@ describe('Repository', () => {
 
     const query = execute.mock.calls[0]?.[0]
     const compiled = compiledSql(query)
+    expect(compiled).toContain('from pool_predict.pool_memberships m')
+    expect(compiled).toContain('left join pool_predict.leaderboard_totals lt')
+    expect(compiled).toContain('coalesce(lt.rank, 0)::integer as rank')
     expect(compiled).toContain(
-      'order by lt.total_score desc, u.created_at asc, u.intra_user_id asc'
+      'order by (lt.rank is null) asc, lt.rank asc nulls last, u.created_at asc'
     )
-    expect(compiled).toContain('and lt.campus_id = $2::integer')
+    expect(compiled).toContain('and m.campus_id = $2::integer')
   })
 
   it('calculates shared leaderboard ranks from total score only', async () => {

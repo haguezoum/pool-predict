@@ -552,6 +552,7 @@ export class Repository {
     return this.db.execute<{
       user_id: string
       intra_user_id: number
+      created_at: Date
       total_score: number
       rank: number
       predictions: number
@@ -561,26 +562,31 @@ export class Repository {
       missed_exams: number
     }>(sql`
       select
-        lt.user_id,
+        m.user_id,
         u.intra_user_id,
-        lt.total_score,
-        lt.rank,
+        u.created_at,
+        coalesce(lt.total_score, 0)::integer as total_score,
+        coalesce(lt.rank, 0)::integer as rank,
         count(se.bet_id)::integer as predictions,
         count(*) filter (where se.type in ('exact', 'correct'))::integer as correct,
         count(*) filter (where se.type = 'wrong')::integer as wrong,
         count(*) filter (where se.type = 'exact')::integer as exact_hits,
         count(*) filter (where se.type = 'no_bet')::integer as missed_exams
-      from pool_predict.leaderboard_totals lt
+      from pool_predict.pool_memberships m
       join pool_predict.app_users u
-        on u.id = lt.user_id and u.campus_id = lt.campus_id
+        on u.id = m.user_id and u.campus_id = m.campus_id
+      left join pool_predict.leaderboard_totals lt
+        on lt.pool_id = m.pool_id
+       and lt.user_id = m.user_id
+       and lt.campus_id = m.campus_id
       left join pool_predict.score_events se
-        on se.pool_id = lt.pool_id
-       and se.user_id = lt.user_id
-       and se.campus_id = lt.campus_id
-      where lt.pool_id = ${poolId}::uuid
-        and lt.campus_id = ${campusId}::integer
-      group by lt.user_id, u.intra_user_id, u.created_at, lt.total_score, lt.rank
-      order by lt.total_score desc, u.created_at asc, u.intra_user_id asc
+        on se.pool_id = m.pool_id
+       and se.user_id = m.user_id
+       and se.campus_id = m.campus_id
+      where m.pool_id = ${poolId}::uuid
+        and m.campus_id = ${campusId}::integer
+      group by m.user_id, u.intra_user_id, u.created_at, lt.total_score, lt.rank
+      order by (lt.rank is null) asc, lt.rank asc nulls last, u.created_at asc, u.intra_user_id asc
     `)
   }
 

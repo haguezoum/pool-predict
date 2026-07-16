@@ -629,25 +629,40 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       const rows = await repository.getLeaderboard(poolId, campusId)
       const profiles = await fortyTwo.getUsers(rows.map((row) => row.intra_user_id))
       const profileById = new Map(profiles.map((profile) => [profile.id, toPublicUser(profile)]))
-      const response: LeaderboardEntry[] = rows.map((row) => {
+      const response = rows.map((row) => {
         const profile = profileById.get(row.intra_user_id)
         return {
-          campusId,
-          rank: row.rank,
-          intraUserId: row.intra_user_id,
-          login: profile?.login ?? `user-${row.intra_user_id}`,
-          displayName: profile?.displayName ?? `42 user ${row.intra_user_id}`,
-          avatarUrl: profile?.avatarUrl ?? '',
-          totalScore: row.total_score,
-          predictions: row.predictions,
-          correct: row.correct,
-          wrong: row.wrong,
-          exactHits: row.exact_hits,
-          missedExams: row.missed_exams,
-          accuracy: accuracy(row.correct, row.wrong),
+          entry: {
+            campusId,
+            rank: row.rank,
+            intraUserId: row.intra_user_id,
+            login: profile?.login ?? `user-${row.intra_user_id}`,
+            displayName: profile?.displayName ?? `42 user ${row.intra_user_id}`,
+            avatarUrl: profile?.avatarUrl ?? '',
+            totalScore: row.total_score,
+            predictions: row.predictions,
+            correct: row.correct,
+            wrong: row.wrong,
+            exactHits: row.exact_hits,
+            missedExams: row.missed_exams,
+            accuracy: accuracy(row.correct, row.wrong),
+          } satisfies LeaderboardEntry,
+          createdAt: row.created_at.getTime(),
         }
       })
-      res.json(response)
+      response.sort((left, right) => {
+        const leftRanked = left.entry.rank > 0
+        const rightRanked = right.entry.rank > 0
+        if (leftRanked && rightRanked) {
+          return left.entry.rank - right.entry.rank
+            || left.entry.login.localeCompare(right.entry.login)
+        }
+        if (leftRanked) return -1
+        if (rightRanked) return 1
+        return left.createdAt - right.createdAt
+          || left.entry.login.localeCompare(right.entry.login)
+      })
+      res.json(response.map(({ entry }) => entry))
     })
   )
 

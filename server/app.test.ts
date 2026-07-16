@@ -233,18 +233,47 @@ describe('Express API boundary', () => {
     expect(fortyTwo.getPoolerProjectResults).toHaveBeenCalledWith(snapshot, 42)
   })
 
-  it('reads the leaderboard without blocking on a live pool synchronization', async () => {
+  it('sorts all leaderboard members by rank, login tie-break, then creation date', async () => {
     const user = { id: 'user-id', intraUserId: 7, campusId: 55 }
+    const leaderboardRow = (
+      intraUserId: number,
+      rank: number,
+      createdAt: string,
+      totalScore = 0
+    ) => ({
+      user_id: `user-${intraUserId}`,
+      intra_user_id: intraUserId,
+      created_at: new Date(createdAt),
+      total_score: totalScore,
+      rank,
+      predictions: 0,
+      correct: 0,
+      wrong: 0,
+      exact_hits: 0,
+      missed_exams: 0,
+    })
     const repository = {
       getSession: vi.fn().mockResolvedValue({ user }),
       getLatestPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [] }),
       getPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id', campusId: 55 }, exams: [] }),
       rebuildLeaderboard: vi.fn().mockResolvedValue(undefined),
-      getLeaderboard: vi.fn().mockResolvedValue([]),
+      getLeaderboard: vi.fn().mockResolvedValue([
+        leaderboardRow(5, 0, '2026-01-01T00:00:00.000Z'),
+        leaderboardRow(2, 2, '2026-01-03T00:00:00.000Z', 10),
+        leaderboardRow(4, 0, '2026-01-02T00:00:00.000Z'),
+        leaderboardRow(1, 1, '2026-01-04T00:00:00.000Z', 20),
+        leaderboardRow(3, 2, '2026-01-05T00:00:00.000Z', 10),
+      ]),
     } as unknown as Repository
     const fortyTwo = {
       getCurrentPool: vi.fn(),
-      getUsers: vi.fn().mockResolvedValue([]),
+      getUsers: vi.fn().mockResolvedValue([
+        { id: 1, login: 'champ', displayname: 'Champion' },
+        { id: 2, login: 'zebra', displayname: 'Zebra' },
+        { id: 3, login: 'alpha', displayname: 'Alpha' },
+        { id: 4, login: 'newer', displayname: 'Newer' },
+        { id: 5, login: 'older', displayname: 'Older' },
+      ]),
     } as unknown as FortyTwoClient
     const app = createApp({ env, repository, fortyTwo })
     const { client } = await localRequest(app)
@@ -254,7 +283,14 @@ describe('Express API boundary', () => {
       .set('Cookie', 'pool_predict_session=session-token')
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual([])
+    expect(response.body.map((entry: { login: string }) => entry.login)).toEqual([
+      'champ',
+      'alpha',
+      'zebra',
+      'older',
+      'newer',
+    ])
+    expect(response.body.at(-1)).toMatchObject({ login: 'newer', rank: 0 })
     expect(fortyTwo.getCurrentPool).not.toHaveBeenCalled()
     expect(repository.rebuildLeaderboard).toHaveBeenCalledWith('pool-id', 55)
   })

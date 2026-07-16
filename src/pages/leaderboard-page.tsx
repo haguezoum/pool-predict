@@ -19,6 +19,10 @@ function rankStyle(rank: number) {
   return 'bg-muted text-muted-foreground'
 }
 
+function rankLabel(rank: number) {
+  return rank > 0 ? rank : '—'
+}
+
 function initials(name: string) {
   return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
 }
@@ -38,10 +42,10 @@ export function LeaderboardPage() {
     queryKey: ['leaderboard', user?.campusId, selectedPoolId ?? 'current'],
     queryFn: () => api.leaderboard(user!.campusId, selectedPoolId ?? undefined),
     enabled: Boolean(user?.campusId),
-    staleTime: 2 * 60_000,
+    staleTime: 5 * 60_000,
   })
   const leaderboard = leaderboardQuery.data ?? []
-  const top3 = leaderboard.slice(0, 3)
+  const top3 = leaderboard.filter((entry) => entry.rank > 0).slice(0, 3)
 
   if (poolQuery.isPending || leaderboardQuery.isPending) {
     return (
@@ -78,7 +82,7 @@ export function LeaderboardPage() {
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            {selectedPool?.status === 'closed' ? 'Archived pool' : 'Current pool'} · players are ranked by score; ties show the earliest sign-in first.
+            {selectedPool?.status === 'closed' ? 'Archived pool' : 'Current pool'} · rank ties are sorted by login; unranked players follow by account age.
           </p>
         </div>
         {(poolQuery.data?.length ?? 0) > 1 ? (
@@ -112,7 +116,7 @@ export function LeaderboardPage() {
               >
                 <CardHeader className="items-center text-center">
                   <span className={cn('flex size-8 items-center justify-center rounded-full text-sm font-bold tabular-nums', rankStyle(entry.rank))}>
-                    {entry.rank}
+                    {rankLabel(entry.rank)}
                   </span>
                   <Link
                     to={`/profile/${entry.intraUserId}?poolId=${encodeURIComponent(activePoolId ?? '')}`}
@@ -144,7 +148,7 @@ export function LeaderboardPage() {
           <Card key={entry.intraUserId} size="sm" className={cn(entry.login === user?.login && 'ring-2 ring-primary/40')}>
             <CardContent className="flex items-center gap-3 pt-(--card-spacing)">
               <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
-                {entry.rank}
+                {rankLabel(entry.rank)}
               </span>
               <Link
                 to={`/profile/${entry.intraUserId}?poolId=${encodeURIComponent(activePoolId ?? '')}`}
@@ -189,7 +193,7 @@ export function LeaderboardPage() {
               <TableRow key={entry.intraUserId} className={cn(entry.login === user?.login && 'bg-primary/5')}>
                 <TableCell>
                   <span className={cn('inline-flex size-7 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
-                    {entry.rank}
+                    {rankLabel(entry.rank)}
                   </span>
                 </TableCell>
                 <TableCell>

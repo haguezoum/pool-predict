@@ -12,7 +12,7 @@ Private Exam 00–03 prediction platform for the 1337 MED Tetouan Piscine. The 4
 - Unpredicted individual poolers: **0**
 - Equal totals receive the same SQL `rank()`
 
-The first successful login enrolls a student in the current pool. Missed-exam penalties apply only after the pool closes and only to exams that lock after enrollment, never retroactively. Players without a settled score remain unranked. Predictions remain private until the exam lock.
+The first successful login enrolls a student in the current pool. Every enrolled student appears on that pool's leaderboard. Ranked players come first, rank ties are sorted by 42 login, and unranked players follow in account-creation order. Missed-exam penalties apply only after the pool closes and only to exams that lock after enrollment, never retroactively. Players without a settled score remain unranked. Predictions remain private until the exam lock.
 
 ## Architecture
 
