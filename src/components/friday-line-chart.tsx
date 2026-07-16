@@ -30,6 +30,18 @@ type FridayLineChartProps = {
   projectStatus?: 'idle' | 'loading' | 'error'
 }
 
+type ProgressPoint =
+  | {
+      key: string
+      kind: 'exam'
+      examIndex: number
+    }
+  | {
+      key: string
+      kind: 'project'
+      project: ProjectResultView
+    }
+
 /**
  * MUI LineChart of Friday results.
  * - Null points = not validated (gaps; connectNulls bridges the line)
@@ -47,23 +59,49 @@ export function FridayLineChart({
   const controlsId = useId()
   const [showExams, setShowExams] = useState(true)
   const [showProjects, setShowProjects] = useState(true)
-  const xData = fridays.map((f) => f.label)
-  const data = fridays.map((f) => f.value)
-  const projectWeeks = fridays.map((_, week) => {
-    const scores = projectResults
-      .filter((project) => project.week === week && project.score !== null)
-      .map((project) => project.score as number)
-    return {
-      count: scores.length,
-      value: scores.length === 0
-        ? null
-        : Math.round(scores.reduce((total, score) => total + score, 0) / scores.length),
-    }
-  })
   let latestValidatedProject: ProjectResultView | undefined
   for (const project of projectResults) {
     if (project.validated === true) latestValidatedProject = project
   }
+  const progressPoints: ProgressPoint[] = showSeriesControls
+    ? fridays.flatMap((_, examIndex) => [
+        ...projectResults
+          .filter((project) => project.week === examIndex && project.score !== null)
+          .map((project): ProgressPoint => ({
+            key: `project-${project.projectId}`,
+            kind: 'project',
+            project,
+          })),
+        {
+          key: `exam-${examIndex}`,
+          kind: 'exam' as const,
+          examIndex,
+        },
+      ])
+    : fridays.map((_, examIndex) => ({
+        key: `exam-${examIndex}`,
+        kind: 'exam',
+        examIndex,
+      }))
+  const xData = progressPoints.map((point) => point.key)
+  const xLabels = new Map(
+    progressPoints.map((point) => [
+      point.key,
+      point.kind === 'exam'
+        ? !showSeriesControls || showExams
+          ? (fridays[point.examIndex]?.label ?? '')
+          : ''
+        : showProjects && point.project.projectId === latestValidatedProject?.projectId
+          ? point.project.name
+          : '',
+    ]),
+  )
+  const examData = progressPoints.map((point) =>
+    point.kind === 'exam' ? (fridays[point.examIndex]?.value ?? null) : null,
+  )
+  const projectData = progressPoints.map((point) =>
+    point.kind === 'project' ? point.project.score : null,
+  )
   const examSeriesId = `exams-${login}`
   const projectSeriesId = `projects-${login}`
   const series = [
@@ -71,12 +109,13 @@ export function FridayLineChart({
       ? [{
           id: examSeriesId,
           label: showSeriesControls ? 'Exams' : `@${login}`,
-          data,
+          data: examData,
           connectNulls: true,
           showMark: true,
           color: colors.series,
           valueFormatter: (value: number | null, { dataIndex }: { dataIndex: number }) => {
-            const friday = fridays[dataIndex]
+            const point = progressPoints[dataIndex]
+            const friday = point?.kind === 'exam' ? fridays[point.examIndex] : undefined
             if (value == null || !friday?.validated) return 'Not validated'
             return friday.score ? `Score ${friday.score}` : String(value)
           },
@@ -86,14 +125,14 @@ export function FridayLineChart({
       ? [{
           id: projectSeriesId,
           label: latestValidatedProject?.name ?? 'Projects',
-          data: projectWeeks.map((week) => week.value),
+          data: projectData,
           connectNulls: true,
           showMark: true,
           color: colors.projectSeries,
           valueFormatter: (value: number | null, { dataIndex }: { dataIndex: number }) => {
-            const week = projectWeeks[dataIndex]
-            if (value == null || !week?.count) return 'No project score'
-            return `Average ${value} · ${week.count} project${week.count === 1 ? '' : 's'}`
+            const point = progressPoints[dataIndex]
+            if (value == null || point?.kind !== 'project') return 'No project score'
+            return `${point.project.name} · Score ${value}`
           },
         }]
       : []),
@@ -103,7 +142,7 @@ export function FridayLineChart({
     <div className="relative z-10 flex w-full flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {showSeriesControls ? 'Weekly scores · 0–100' : 'Last 4 exams'}
+          {showSeriesControls ? 'Exam & project progression · 0–100' : 'Last 4 exams'}
         </p>
         {showSeriesControls ? (
           <fieldset className="flex items-center gap-3" aria-label="Chart lines">
@@ -143,17 +182,24 @@ export function FridayLineChart({
             : 'Project scores are temporarily unavailable.'}
         </p>
       ) : null}
-      <Stack sx={{ width: '100%', height: showSeriesControls ? 250 : 140, overflow: 'visible' }}>
+      <Stack sx={{ width: '100%', height: showSeriesControls ? 320 : 140, overflow: 'visible' }}>
         <LineChart
           key={colors.axis}
           xAxis={[
             {
               data: xData,
               scaleType: 'point',
-              height: 28,
+              height: showSeriesControls ? 88 : 28,
+              valueFormatter: (value: string) => xLabels.get(value) ?? '',
               tickLabelStyle: {
                 fill: colors.tickLabel,
                 fontSize: 10,
+                ...(showSeriesControls
+                  ? {
+                      angle: -90,
+                      textAnchor: 'end' as const,
+                    }
+                  : {}),
               },
             },
           ]}
