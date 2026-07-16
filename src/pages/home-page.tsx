@@ -64,11 +64,19 @@ function examHasEnded(exam: ExamView) {
   return Date.now() >= new Date(exam.endsAt ?? exam.lockAt).getTime()
 }
 
-function RevealedPredictions({ exam, poolerIntraId }: { exam: ExamView; poolerIntraId: number }) {
+function RevealedPredictions({
+  exam,
+  poolerIntraId,
+  campusId,
+}: {
+  exam: ExamView
+  poolerIntraId: number
+  campusId: number
+}) {
   const ended = examHasEnded(exam)
   const query = useQuery({
-    queryKey: ['revealed-bets', exam.id],
-    queryFn: () => api.revealedBets(exam.id),
+    queryKey: ['revealed-bets', campusId, exam.id],
+    queryFn: () => api.revealedBets(exam.id, campusId),
     enabled: ended,
     staleTime: 60_000,
   })
@@ -106,13 +114,14 @@ function RevealedPredictions({ exam, poolerIntraId }: { exam: ExamView; poolerIn
 type MatchCardProps = {
   match: Match
   poolId: string
+  campusId: number
   exam: ExamView
   bet: BetView | undefined
   sourceAvailable: boolean
   hideCharts: boolean
 }
 
-function MatchCard({ match, poolId, exam, bet, sourceAvailable, hideCharts }: MatchCardProps) {
+function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCharts }: MatchCardProps) {
   const queryClient = useQueryClient()
   const [decision, setDecision] = useState<'validate' | 'not_validate' | null>(
     bet?.prediction ?? null
@@ -121,14 +130,14 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable, hideCharts }: Ma
   const [expanded, setExpanded] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: (input: BetInput) => api.saveBet(exam.id, match.intraUserId, input),
+    mutationFn: (input: BetInput) => api.saveBet(exam.id, match.intraUserId, campusId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['bets'] })
     },
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteBet(exam.id, match.intraUserId),
+    mutationFn: () => api.deleteBet(exam.id, match.intraUserId, campusId),
     onSuccess: () => {
       setDecision(null)
       setScore('')
@@ -142,8 +151,8 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable, hideCharts }: Ma
   function prefetchPlayerDetails() {
     void loadPlayerDetailDialog()
     void queryClient.prefetchQuery({
-      queryKey: poolerProjectsQueryKey(poolId, match.intraUserId),
-      queryFn: () => api.poolerProjects(poolId, match.intraUserId),
+      queryKey: poolerProjectsQueryKey(campusId, poolId, match.intraUserId),
+      queryFn: () => api.poolerProjects(poolId, match.intraUserId, campusId),
       staleTime: POOLER_PROJECTS_CACHE_MS,
     })
   }
@@ -284,7 +293,11 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable, hideCharts }: Ma
               </div>
             ) : null}
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
-            <RevealedPredictions exam={exam} poolerIntraId={match.intraUserId} />
+            <RevealedPredictions
+              exam={exam}
+              poolerIntraId={match.intraUserId}
+              campusId={campusId}
+            />
           </CardContent>
 
           {!hideCharts ? (
@@ -302,6 +315,7 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable, hideCharts }: Ma
           <PlayerDetailDialog
             match={match}
             poolId={poolId}
+            campusId={campusId}
             open
             onOpenChange={setExpanded}
           />
@@ -325,20 +339,21 @@ export function HomePage() {
   const queryClient = useQueryClient()
 
   const poolQuery = useQuery({
-    queryKey: ['pool', 'current'],
-    queryFn: api.currentPool,
+    queryKey: ['pool', user?.campusId, 'current'],
+    queryFn: () => api.currentPool(user!.campusId),
+    enabled: Boolean(user?.campusId),
     staleTime: 5 * 60_000,
   })
   const pool = poolQuery.data
   const poolersQuery = useQuery({
-    queryKey: ['poolers', pool?.id],
-    queryFn: () => api.poolers(pool!.id),
+    queryKey: ['poolers', user?.campusId, pool?.id],
+    queryFn: () => api.poolers(pool!.id, user!.campusId),
     enabled: Boolean(pool?.id && pool.sourceAvailable),
     staleTime: 5 * 60_000,
   })
   const betsQuery = useQuery({
-    queryKey: ['bets', pool?.id],
-    queryFn: () => api.myBets(pool!.id),
+    queryKey: ['bets', user?.campusId, pool?.id],
+    queryFn: () => api.myBets(pool!.id, user!.campusId),
     enabled: Boolean(pool?.id),
     staleTime: 60_000,
   })
@@ -614,6 +629,7 @@ export function HomePage() {
                           key={`${selectedExam.id}-${match.id}`}
                           match={match}
                           poolId={pool.id}
+                          campusId={pool.campusId}
                           exam={selectedExam}
                           bet={betsByPooler.get(match.intraUserId)}
                           sourceAvailable={pool.sourceAvailable}
@@ -640,6 +656,7 @@ export function HomePage() {
       ) : user ? (
         <PredictionHistory
           poolId={pool.id}
+          campusId={pool.campusId}
           intraUserId={user.intraUserId}
           initialData={initialPredictionHistory}
         />

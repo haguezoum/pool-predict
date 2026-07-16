@@ -23,6 +23,7 @@ import {
   FortyTwoClient,
   FortyTwoUnavailableError,
   isEligibleUser,
+  primaryCampusId,
   toPublicUser,
 } from './services/forty-two.js'
 import { Repository, type AppUserRow, type ExamRow } from './services/repository.js'
@@ -136,6 +137,7 @@ function poolView(
   return {
     id: pool.id,
     externalRef: pool.externalRef,
+    campusId: pool.campusId,
     startsAt: pool.startsAt.toISOString(),
     endsAt: pool.endsAt.toISOString(),
     status: getPoolStatus(pool.startsAt, pool.endsAt, exams),
@@ -163,6 +165,7 @@ function poolView(
 function betView(row: Awaited<ReturnType<Repository['listUserBets']>>[number]): BetView {
   return {
     id: row.id,
+    campusId: row.campusId,
     examId: row.examId,
     poolerIntraId: row.poolerIntraId,
     prediction: row.prediction,
@@ -234,6 +237,17 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     return res.locals.auth as AuthState
   }
 
+  function campusFromRequest(req: Request, res: Response) {
+    const campusId = authFrom(res).user.campusId
+    const requested = req.query.campusId
+    if (requested === undefined) return campusId
+    const requestedCampusId = z.coerce.number().int().positive().parse(requested)
+    if (requestedCampusId !== campusId) {
+      throw new ApiError(403, 'CROSS_CAMPUS_ACCESS', 'Campus data is isolated')
+    }
+    return campusId
+  }
+
   app.get('/api/auth/42', (_req, res) => {
     const state = randomBytes(24).toString('base64url')
     setCookie(res, OAUTH_STATE_COOKIE, state, env, 10 * 60 * 1_000)
@@ -258,15 +272,16 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
 
       try {
         const token = await fortyTwo.exchangeAuthorizationCode(code)
-        const [me, synced] = await Promise.all([
-          fortyTwo.getMe(token.access_token),
-          syncPool(repository, fortyTwo),
-        ])
+        const me = await fortyTwo.getMe(token.access_token)
+        const campusId = primaryCampusId(me)
+        const allowedCampusIds = new Set(
+          [env.campusId, ...env.allowedCampusIds].filter((id): id is number => Boolean(id))
+        )
+        if (!campusId || !allowedCampusIds.has(campusId)) {
+          return res.redirect(`${env.appOrigin}/login?error=INELIGIBLE_CAMPUS`)
+        }
+        const synced = await syncPool(repository, fortyTwo, campusId)
         const poolerIds = new Set(synced.snapshot.poolers.map((pooler) => pooler.intraUserId))
-        const allowedCampusIds = new Set([
-          synced.snapshot.campusId,
-          ...env.allowedCampusIds,
-        ])
         const eligibility = isEligibleUser(
           me,
           {
@@ -280,12 +295,13 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
           return res.redirect(`${env.appOrigin}/login?error=${eligibility.reason}`)
         }
 
-        const user = await repository.upsertUser(me.id)
-        await repository.enroll(synced.pool.id, user.id, synced.exams)
+        const user = await repository.upsertUser(me.id, campusId)
+        await repository.enroll(synced.pool.id, user.id, campusId, synced.exams)
         const rawSession = randomBytes(32).toString('base64url')
         await repository.createSession(
           hashToken(rawSession),
           user.id,
+          campusId,
           new Date(Date.now() + SESSION_DURATION_MS)
         )
         setCookie(res, SESSION_COOKIE, rawSession, env, SESSION_DURATION_MS)
@@ -315,14 +331,15 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       const auth = authFrom(res)
       const [profile, pools] = await Promise.all([
         fortyTwo.getUser(auth.user.intraUserId),
-        repository.listUserPools(auth.user.id),
+        repository.listUserPools(auth.user.id, auth.user.campusId),
       ])
       const poolId = pools[0]?.pool.id
       if (!poolId) throw new ApiError(403, 'NOT_ENROLLED', 'Pool enrollment is missing')
-      const stats = await repository.getUserStats(poolId, auth.user.id)
+      const stats = await repository.getUserStats(poolId, auth.user.id, auth.user.campusId)
       const publicUser = toPublicUser(profile)
       const viewer: Viewer = {
         ...publicUser,
+        campusId: auth.user.campusId,
         totalScore: stats.total_score,
         rank: stats.rank,
         predictions: stats.predictions,
@@ -339,20 +356,21 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
   app.get(
     '/api/pools/current',
     requireAuth,
-    asyncHandler(async (_req, res) => {
+    asyncHandler(async (req, res) => {
       const auth = authFrom(res)
+      const campusId = campusFromRequest(req, res)
       try {
-        const synced = await syncPool(repository, fortyTwo)
+        const synced = await syncPool(repository, fortyTwo, campusId)
         const membership =
-          (await repository.getMembership(synced.pool.id, auth.user.id)) ??
-          (await repository.enroll(synced.pool.id, auth.user.id, synced.exams))
+          (await repository.getMembership(synced.pool.id, auth.user.id, campusId)) ??
+          (await repository.enroll(synced.pool.id, auth.user.id, campusId, synced.exams))
         await settlePool(repository, fortyTwo, synced)
         res.json(poolView(synced.pool, synced.exams, membership?.enrolledAt ?? null, true))
       } catch (error) {
         if (!(error instanceof FortyTwoUnavailableError)) throw error
-        const stored = await repository.getLatestPool()
+        const stored = await repository.getLatestPool(campusId)
         if (!stored) throw new ApiError(503, 'SOURCE_UNAVAILABLE', '42 data is temporarily unavailable')
-        const membership = await repository.getMembership(stored.pool.id, auth.user.id)
+        const membership = await repository.getMembership(stored.pool.id, auth.user.id, campusId)
         res.json(poolView(stored.pool, stored.exams, membership?.enrolledAt ?? null, false))
       }
     })
@@ -361,14 +379,17 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
   app.get(
     '/api/pools',
     requireAuth,
-    asyncHandler(async (_req, res) => {
-      const rows = await repository.listUserPools(authFrom(res).user.id)
+    asyncHandler(async (req, res) => {
+      const auth = authFrom(res)
+      const campusId = campusFromRequest(req, res)
+      const rows = await repository.listUserPools(auth.user.id, campusId)
       const response: PoolSummary[] = await Promise.all(
         rows.map(async ({ pool }) => {
-          const stored = await repository.getPool(pool.id)
+          const stored = await repository.getPool(pool.id, campusId)
           return {
             id: pool.id,
             externalRef: pool.externalRef,
+            campusId,
             startsAt: pool.startsAt.toISOString(),
             endsAt: pool.endsAt.toISOString(),
             status: getPoolStatus(pool.startsAt, pool.endsAt, stored?.exams ?? []),
@@ -384,9 +405,10 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     requireAuth,
     asyncHandler(async (req, res) => {
       const auth = authFrom(res)
-      const stored = await repository.getPool(routeParam(req, 'poolId'))
+      const campusId = campusFromRequest(req, res)
+      const stored = await repository.getPool(routeParam(req, 'poolId'), campusId)
       if (!stored) throw new ApiError(404, 'POOL_NOT_FOUND', 'Pool not found')
-      const membership = await repository.getMembership(stored.pool.id, auth.user.id)
+      const membership = await repository.getMembership(stored.pool.id, auth.user.id, campusId)
       if (!membership) throw new ApiError(403, 'NOT_ENROLLED', 'You did not join this pool')
       res.json(poolView(stored.pool, stored.exams, membership.enrolledAt, true))
     })
@@ -396,7 +418,8 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     '/api/pools/:poolId/poolers',
     requireAuth,
     asyncHandler(async (req, res) => {
-      const synced = await syncPool(repository, fortyTwo)
+      const campusId = campusFromRequest(req, res)
+      const synced = await syncPool(repository, fortyTwo, campusId)
       if (synced.pool.id !== routeParam(req, 'poolId')) {
         throw new ApiError(409, 'LIVE_DATA_CURRENT_POOL_ONLY', 'Live pooler data is available for the current pool')
       }
@@ -411,6 +434,7 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       res.json(
         synced.snapshot.poolers.map((pooler) => ({
           ...pooler,
+          campusId,
           results: synced.snapshot.exams.map((exam, index) => {
             const result = resultMaps[index].get(pooler.intraUserId)
             return {
@@ -429,7 +453,8 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     requireAuth,
     asyncHandler(async (req, res) => {
       const poolerIntraId = z.coerce.number().int().positive().parse(routeParam(req, 'pooler42Id'))
-      const synced = await syncPool(repository, fortyTwo)
+      const campusId = campusFromRequest(req, res)
+      const synced = await syncPool(repository, fortyTwo, campusId)
       if (synced.pool.id !== routeParam(req, 'poolId')) {
         throw new ApiError(409, 'LIVE_DATA_CURRENT_POOL_ONLY', 'Live project data is available for the current pool')
       }
@@ -446,7 +471,9 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     requireAuth,
     asyncHandler(async (req, res) => {
       const poolId = typeof req.query.poolId === 'string' ? req.query.poolId : undefined
-      const rows = await repository.listUserBets(authFrom(res).user.id, poolId)
+      const auth = authFrom(res)
+      const campusId = campusFromRequest(req, res)
+      const rows = await repository.listUserBets(auth.user.id, campusId, poolId)
       res.json(rows.map(betView))
     })
   )
@@ -456,11 +483,12 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     requireAuth,
     asyncHandler(async (req, res) => {
       const auth = authFrom(res)
+      const campusId = campusFromRequest(req, res)
       const poolId = routeParam(req, 'poolId')
       const intraUserId = z.coerce.number().int().positive().parse(routeParam(req, 'intraUserId'))
-      const stored = await repository.getPool(poolId)
+      const stored = await repository.getPool(poolId, campusId)
       if (!stored) throw new ApiError(404, 'POOL_NOT_FOUND', 'Pool not found')
-      const target = await repository.getPoolMemberByIntraId(poolId, intraUserId)
+      const target = await repository.getPoolMemberByIntraId(poolId, intraUserId, campusId)
       if (!target) {
         throw new ApiError(404, 'PLAYER_NOT_FOUND', 'This player did not join the selected pool')
       }
@@ -468,7 +496,7 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       const isViewer = target.id === auth.user.id
       const now = new Date()
       const examById = new Map(stored.exams.map((exam) => [exam.id, exam]))
-      const rows = (await repository.listUserBets(target.id, poolId)).filter((bet) => {
+      const rows = (await repository.listUserBets(target.id, campusId, poolId)).filter((bet) => {
         const exam = examById.get(bet.examId)
         return Boolean(exam && (isViewer || examHasEnded(exam, now)))
       })
@@ -508,11 +536,12 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     requireAuth,
     asyncHandler(async (req, res) => {
       const auth = authFrom(res)
+      const campusId = campusFromRequest(req, res)
       const input = betInputSchema.parse(req.body) as BetInput
       const poolerIntraId = z.coerce.number().int().positive().parse(routeParam(req, 'pooler42Id'))
-      const exam = await repository.getExam(routeParam(req, 'examId'))
+      const exam = await repository.getExam(routeParam(req, 'examId'), campusId)
       if (!exam) throw new ApiError(404, 'EXAM_NOT_FOUND', 'Exam not found')
-      const synced = await syncPool(repository, fortyTwo)
+      const synced = await syncPool(repository, fortyTwo, campusId)
       if (
         synced.pool.id !== exam.poolId ||
         !synced.snapshot.poolers.some((pooler) => pooler.intraUserId === poolerIntraId)
@@ -521,6 +550,7 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       }
       const saved = await repository.upsertBet(
         auth.user.id,
+        campusId,
         exam.id,
         poolerIntraId,
         input
@@ -534,9 +564,11 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     '/api/bets/:examId/:pooler42Id',
     requireAuth,
     asyncHandler(async (req, res) => {
+      const campusId = campusFromRequest(req, res)
       const poolerIntraId = z.coerce.number().int().positive().parse(routeParam(req, 'pooler42Id'))
       const deleted = await repository.deleteBet(
         authFrom(res).user.id,
+        campusId,
         routeParam(req, 'examId'),
         poolerIntraId
       )
@@ -549,16 +581,17 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     '/api/exams/:examId/revealed-bets',
     requireAuth,
     asyncHandler(async (req, res) => {
-      const exam = await repository.getExam(routeParam(req, 'examId'))
+      const campusId = campusFromRequest(req, res)
+      const exam = await repository.getExam(routeParam(req, 'examId'), campusId)
       if (!exam) throw new ApiError(404, 'EXAM_NOT_FOUND', 'Exam not found')
       if (!examHasEnded(exam)) {
         throw new ApiError(403, 'BETS_PRIVATE', 'Predictions are private until the exam ends')
       }
-      const rows = await repository.listExamBets(exam.id)
+      const rows = await repository.listExamBets(exam.id, campusId)
       const profiles = await fortyTwo.getUsers(rows.map((row) => row.poolerIntraId))
       const profileById = new Map(profiles.map((profile) => [profile.id, profile.login]))
       const appUserIds = [...new Set(rows.map((row) => row.userId))]
-      const leaderboard = await repository.getLeaderboard(exam.poolId)
+      const leaderboard = await repository.getLeaderboard(exam.poolId, campusId)
       const bettorIntraByAppId = new Map(leaderboard.map((row) => [row.user_id, row.intra_user_id]))
       const bettorProfiles = await fortyTwo.getUsers(
         appUserIds.map((id) => bettorIntraByAppId.get(id)).filter((id): id is number => Boolean(id))
@@ -582,20 +615,24 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     '/api/leaderboard',
     requireAuth,
     asyncHandler(async (req, res) => {
+      const campusId = campusFromRequest(req, res)
       const requestedPoolId = typeof req.query.poolId === 'string' ? req.query.poolId : null
       let poolId = requestedPoolId
       if (!poolId) {
-        const stored = await repository.getLatestPool()
+        const stored = await repository.getLatestPool(campusId)
         poolId = stored?.pool.id ?? null
       }
       if (!poolId) throw new ApiError(404, 'POOL_NOT_FOUND', 'No pool is available')
-      await repository.rebuildLeaderboard(poolId)
-      const rows = await repository.getLeaderboard(poolId)
+      const stored = await repository.getPool(poolId, campusId)
+      if (!stored) throw new ApiError(404, 'POOL_NOT_FOUND', 'No pool is available')
+      await repository.rebuildLeaderboard(poolId, campusId)
+      const rows = await repository.getLeaderboard(poolId, campusId)
       const profiles = await fortyTwo.getUsers(rows.map((row) => row.intra_user_id))
       const profileById = new Map(profiles.map((profile) => [profile.id, toPublicUser(profile)]))
       const response: LeaderboardEntry[] = rows.map((row) => {
         const profile = profileById.get(row.intra_user_id)
         return {
+          campusId,
           rank: row.rank,
           intraUserId: row.intra_user_id,
           login: profile?.login ?? `user-${row.intra_user_id}`,
@@ -622,10 +659,27 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       if (!safeEqual(authorization, `Bearer ${env.cronSecret}`)) {
         throw new ApiError(401, 'INVALID_CRON_SECRET', 'Invalid cron secret')
       }
-      const synced = await syncPool(repository, fortyTwo)
-      await settlePool(repository, fortyTwo, synced)
+      const campusIds = [...new Set(
+        [env.campusId, ...env.allowedCampusIds].filter((id): id is number => Boolean(id))
+      )]
+      const pools = await Promise.all(
+        campusIds.map(async (campusId) => {
+          try {
+            const synced = await syncPool(repository, fortyTwo, campusId)
+            await settlePool(repository, fortyTwo, synced)
+            return { campusId, poolId: synced.pool.id, ok: true as const }
+          } catch (error) {
+            return {
+              campusId,
+              poolId: null,
+              ok: false as const,
+              error: error instanceof FortyTwoUnavailableError ? 'SOURCE_UNAVAILABLE' : 'SYNC_FAILED',
+            }
+          }
+        })
+      )
       await repository.pruneExpiredSessions()
-      res.json({ ok: true, poolId: synced.pool.id, syncedAt: new Date().toISOString() })
+      res.json({ ok: pools.some((pool) => pool.ok), pools, syncedAt: new Date().toISOString() })
     })
   )
 

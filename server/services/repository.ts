@@ -5,7 +5,6 @@ import {
   appUsers,
   bets,
   examRefs,
-  leaderboardTotals,
   poolMemberships,
   poolRefs,
   scoreEvents,
@@ -20,6 +19,7 @@ export type BetRow = typeof bets.$inferSelect
 
 type RawBetRow = {
   id: string
+  campus_id: number
   pool_id: string
   exam_id: string
   user_id: string
@@ -33,6 +33,7 @@ type RawBetRow = {
 function betRowFromSql(row: RawBetRow): BetRow {
   return {
     id: row.id,
+    campusId: row.campus_id,
     poolId: row.pool_id,
     examId: row.exam_id,
     userId: row.user_id,
@@ -96,20 +97,20 @@ export class Repository {
     `)
   }
 
-  async upsertUser(intraUserId: number) {
+  async upsertUser(intraUserId: number, campusId: number) {
     const [user] = await this.db
       .insert(appUsers)
-      .values({ intraUserId })
+      .values({ intraUserId, campusId })
       .onConflictDoUpdate({
-        target: appUsers.intraUserId,
-        set: { intraUserId },
+        target: [appUsers.intraUserId, appUsers.campusId],
+        set: { intraUserId, campusId },
       })
       .returning()
     return user
   }
 
-  async createSession(tokenHash: string, userId: string, expiresAt: Date) {
-    await this.db.insert(sessions).values({ tokenHash, userId, expiresAt })
+  async createSession(tokenHash: string, userId: string, campusId: number, expiresAt: Date) {
+    await this.db.insert(sessions).values({ tokenHash, userId, campusId, expiresAt })
   }
 
   async getSession(tokenHash: string) {
@@ -146,11 +147,12 @@ export class Repository {
       .insert(poolRefs)
       .values({
         externalRef: snapshot.externalRef,
+        campusId: snapshot.campusId,
         startsAt: snapshot.startsAt,
         endsAt: snapshot.endsAt,
       })
       .onConflictDoUpdate({
-        target: poolRefs.externalRef,
+        target: [poolRefs.externalRef, poolRefs.campusId],
         set: {
           startsAt: snapshot.startsAt,
           endsAt: snapshot.endsAt,
@@ -165,6 +167,7 @@ export class Repository {
         .insert(examRefs)
         .values({
           poolId: pool.id,
+          campusId: snapshot.campusId,
           code: exam.code,
           externalExamId: exam.externalExamId,
           externalProjectId: exam.externalProjectId,
@@ -187,71 +190,99 @@ export class Repository {
     return { pool, exams: syncedExams.sort((a, b) => a.code.localeCompare(b.code)) }
   }
 
-  async getLatestPool() {
+  async getLatestPool(campusId: number) {
     const [pool] = await this.db
       .select()
       .from(poolRefs)
+      .where(eq(poolRefs.campusId, campusId))
       .orderBy(desc(poolRefs.startsAt))
       .limit(1)
     if (!pool) return null
     const exams = await this.db
       .select()
       .from(examRefs)
-      .where(eq(examRefs.poolId, pool.id))
+      .where(and(eq(examRefs.poolId, pool.id), eq(examRefs.campusId, campusId)))
       .orderBy(asc(examRefs.code))
     return { pool, exams }
   }
 
-  async getPool(poolId: string) {
-    const [pool] = await this.db.select().from(poolRefs).where(eq(poolRefs.id, poolId)).limit(1)
+  async getPool(poolId: string, campusId: number) {
+    const [pool] = await this.db
+      .select()
+      .from(poolRefs)
+      .where(and(eq(poolRefs.id, poolId), eq(poolRefs.campusId, campusId)))
+      .limit(1)
     if (!pool) return null
     const exams = await this.db
       .select()
       .from(examRefs)
-      .where(eq(examRefs.poolId, pool.id))
+      .where(and(eq(examRefs.poolId, pool.id), eq(examRefs.campusId, campusId)))
       .orderBy(asc(examRefs.code))
     return { pool, exams }
   }
 
-  async listUserPools(userId: string) {
+  async listUserPools(userId: string, campusId: number) {
     return this.db
       .select({ pool: poolRefs, membership: poolMemberships })
       .from(poolMemberships)
-      .innerJoin(poolRefs, eq(poolRefs.id, poolMemberships.poolId))
-      .where(eq(poolMemberships.userId, userId))
+      .innerJoin(
+        poolRefs,
+        and(
+          eq(poolRefs.id, poolMemberships.poolId),
+          eq(poolRefs.campusId, poolMemberships.campusId)
+        )
+      )
+      .where(
+        and(eq(poolMemberships.userId, userId), eq(poolMemberships.campusId, campusId))
+      )
       .orderBy(desc(poolRefs.startsAt))
   }
 
-  async enroll(poolId: string, userId: string, exams: ExamRow[], now = new Date()) {
+  async enroll(
+    poolId: string,
+    userId: string,
+    campusId: number,
+    exams: ExamRow[],
+    now = new Date()
+  ) {
     const firstEligible = exams.find((exam) => exam.lockAt > now)?.code ?? null
     await this.db
       .insert(poolMemberships)
-      .values({ poolId, userId, enrolledAt: now, firstEligibleExamCode: firstEligible })
+      .values({ poolId, userId, campusId, enrolledAt: now, firstEligibleExamCode: firstEligible })
       .onConflictDoNothing()
-    await this.db
-      .insert(leaderboardTotals)
-      .values({ poolId, userId, totalScore: 0, rank: 1 })
-      .onConflictDoNothing()
-    return this.getMembership(poolId, userId)
+    return this.getMembership(poolId, userId, campusId)
   }
 
-  async getMembership(poolId: string, userId: string) {
+  async getMembership(poolId: string, userId: string, campusId: number) {
     const [membership] = await this.db
       .select()
       .from(poolMemberships)
-      .where(and(eq(poolMemberships.poolId, poolId), eq(poolMemberships.userId, userId)))
+      .where(
+        and(
+          eq(poolMemberships.poolId, poolId),
+          eq(poolMemberships.userId, userId),
+          eq(poolMemberships.campusId, campusId)
+        )
+      )
       .limit(1)
     return membership ?? null
   }
 
-  async getPoolMemberByIntraId(poolId: string, intraUserId: number) {
+  async getPoolMemberByIntraId(poolId: string, intraUserId: number, campusId: number) {
     const [row] = await this.db
       .select({ user: appUsers })
       .from(poolMemberships)
-      .innerJoin(appUsers, eq(appUsers.id, poolMemberships.userId))
+      .innerJoin(
+        appUsers,
+        and(
+          eq(appUsers.id, poolMemberships.userId),
+          eq(appUsers.campusId, poolMemberships.campusId)
+        )
+      )
       .where(
         and(
           eq(poolMemberships.poolId, poolId),
+          eq(poolMemberships.campusId, campusId),
           eq(appUsers.intraUserId, intraUserId)
         )
       )
@@ -259,22 +290,36 @@ export class Repository {
     return row?.user ?? null
   }
 
-  async getExam(examId: string) {
-    const [exam] = await this.db.select().from(examRefs).where(eq(examRefs.id, examId)).limit(1)
+  async getExam(examId: string, campusId: number) {
+    const [exam] = await this.db
+      .select()
+      .from(examRefs)
+      .where(and(eq(examRefs.id, examId), eq(examRefs.campusId, campusId)))
+      .limit(1)
     return exam ?? null
   }
 
-  async upsertBet(userId: string, examId: string, poolerIntraId: number, input: BetInput) {
+  async upsertBet(
+    userId: string,
+    campusId: number,
+    examId: string,
+    poolerIntraId: number,
+    input: BetInput
+  ) {
     const rows = await this.db.execute<RawBetRow>(sql`
       insert into pool_predict.bets (
-        pool_id, exam_id, user_id, pooler_intra_id, prediction, predicted_score
+        pool_id, exam_id, user_id, campus_id, pooler_intra_id, prediction, predicted_score
       )
-      select e.pool_id, e.id, ${userId}::uuid, ${poolerIntraId}::bigint,
+      select e.pool_id, e.id, ${userId}::uuid, ${campusId}::integer, ${poolerIntraId}::bigint,
              ${input.prediction}::pool_predict.prediction, ${input.predictedScore}::smallint
       from pool_predict.exam_refs e
       join pool_predict.pool_memberships m
-        on m.pool_id = e.pool_id and m.user_id = ${userId}::uuid
-      where e.id = ${examId}::uuid and now() < e.lock_at
+        on m.pool_id = e.pool_id
+       and m.user_id = ${userId}::uuid
+       and m.campus_id = e.campus_id
+      where e.id = ${examId}::uuid
+        and e.campus_id = ${campusId}::integer
+        and now() < e.lock_at
       on conflict (exam_id, user_id, pooler_intra_id)
       do update set
         prediction = excluded.prediction,
@@ -285,12 +330,14 @@ export class Repository {
     return rows[0] ? betRowFromSql(rows[0]) : null
   }
 
-  async deleteBet(userId: string, examId: string, poolerIntraId: number) {
+  async deleteBet(userId: string, campusId: number, examId: string, poolerIntraId: number) {
     const rows = await this.db.execute<{ id: string }>(sql`
       delete from pool_predict.bets b
       using pool_predict.exam_refs e
       where b.exam_id = e.id
         and b.user_id = ${userId}::uuid
+        and b.campus_id = ${campusId}::integer
+        and e.campus_id = b.campus_id
         and b.exam_id = ${examId}::uuid
         and b.pooler_intra_id = ${poolerIntraId}::bigint
         and now() < e.lock_at
@@ -299,35 +346,50 @@ export class Repository {
     return rows.length > 0
   }
 
-  async listUserBets(userId: string, poolId?: string) {
+  async listUserBets(userId: string, campusId: number, poolId?: string) {
     return this.db
       .select()
       .from(bets)
       .where(
         poolId
-          ? and(eq(bets.userId, userId), eq(bets.poolId, poolId))
-          : eq(bets.userId, userId)
+          ? and(
+              eq(bets.userId, userId),
+              eq(bets.campusId, campusId),
+              eq(bets.poolId, poolId)
+            )
+          : and(eq(bets.userId, userId), eq(bets.campusId, campusId))
       )
       .orderBy(asc(bets.createdAt))
   }
 
-  async listExamBets(examId: string) {
-    return this.db.select().from(bets).where(eq(bets.examId, examId)).orderBy(asc(bets.createdAt))
+  async listExamBets(examId: string, campusId: number) {
+    return this.db
+      .select()
+      .from(bets)
+      .where(and(eq(bets.examId, examId), eq(bets.campusId, campusId)))
+      .orderBy(asc(bets.createdAt))
   }
 
-  async listPoolBets(poolId: string) {
-    return this.db.select().from(bets).where(eq(bets.poolId, poolId))
+  async listPoolBets(poolId: string, campusId: number) {
+    return this.db
+      .select()
+      .from(bets)
+      .where(and(eq(bets.poolId, poolId), eq(bets.campusId, campusId)))
   }
 
-  async applyNoBetPenalties(poolId: string) {
+  async applyNoBetPenalties(poolId: string, campusId: number) {
     await this.db.execute(sql`
       delete from pool_predict.score_events se
       using pool_predict.exam_refs e, pool_predict.pool_memberships m, pool_predict.pool_refs p
       where se.pool_id = ${poolId}::uuid
+        and se.campus_id = ${campusId}::integer
         and se.type = 'no_bet'::pool_predict.score_event_type
         and se.exam_id = e.id
         and p.id = e.pool_id
+        and p.campus_id = se.campus_id
+        and e.campus_id = se.campus_id
         and m.pool_id = e.pool_id
+        and m.campus_id = se.campus_id
         and m.user_id = se.user_id
         and (
           p.ends_at > now()
@@ -340,12 +402,13 @@ export class Repository {
     `)
     await this.db.execute(sql`
       insert into pool_predict.score_events (
-        pool_id, user_id, exam_id, type, points, source_key
+        pool_id, user_id, exam_id, campus_id, type, points, source_key
       )
       select
         e.pool_id,
         m.user_id,
         e.id,
+        e.campus_id,
         'no_bet'::pool_predict.score_event_type,
         -2,
         'no-bet:' || e.id::text || ':' || m.user_id::text
@@ -353,6 +416,9 @@ export class Repository {
       join pool_predict.pool_memberships m on m.pool_id = e.pool_id
       join pool_predict.pool_refs p on p.id = e.pool_id
       where e.pool_id = ${poolId}::uuid
+        and e.campus_id = ${campusId}::integer
+        and m.campus_id = e.campus_id
+        and p.campus_id = e.campus_id
         and p.ends_at <= now()
         and m.enrolled_at < e.lock_at
         and not exists (
@@ -376,6 +442,7 @@ export class Repository {
       .insert(scoreEvents)
       .values({
         poolId: bet.poolId,
+        campusId: bet.campusId,
         userId: bet.userId,
         examId: bet.examId,
         betId: bet.id,
@@ -393,37 +460,45 @@ export class Repository {
       })
   }
 
-  async rebuildLeaderboard(poolId: string) {
+  async rebuildLeaderboard(poolId: string, campusId: number) {
     await this.db.execute(sql`
       with pruned as (
         delete from pool_predict.leaderboard_totals lt
         where lt.pool_id = ${poolId}::uuid
+          and lt.campus_id = ${campusId}::integer
           and not exists (
             select 1 from pool_predict.score_events se
-            where se.pool_id = lt.pool_id and se.user_id = lt.user_id
+            where se.pool_id = lt.pool_id
+              and se.user_id = lt.user_id
+              and se.campus_id = lt.campus_id
           )
       ), totals as (
         select
           m.pool_id,
           m.user_id,
+          m.campus_id,
           sum(se.points)::integer as total_score
         from pool_predict.pool_memberships m
         join pool_predict.score_events se
-          on se.pool_id = m.pool_id and se.user_id = m.user_id
+          on se.pool_id = m.pool_id
+         and se.user_id = m.user_id
+         and se.campus_id = m.campus_id
         where m.pool_id = ${poolId}::uuid
-        group by m.pool_id, m.user_id
+          and m.campus_id = ${campusId}::integer
+        group by m.pool_id, m.user_id, m.campus_id
       ), ranked as (
         select
           pool_id,
           user_id,
+          campus_id,
           total_score,
           rank() over (order by total_score desc)::integer as rank
         from totals
       )
       insert into pool_predict.leaderboard_totals (
-        pool_id, user_id, total_score, rank, updated_at
+        pool_id, user_id, campus_id, total_score, rank, updated_at
       )
-      select pool_id, user_id, total_score, rank, now() from ranked
+      select pool_id, user_id, campus_id, total_score, rank, now() from ranked
       on conflict (pool_id, user_id)
       do update set
         total_score = excluded.total_score,
@@ -432,7 +507,7 @@ export class Repository {
     `)
   }
 
-  async getUserStats(poolId: string, userId: string) {
+  async getUserStats(poolId: string, userId: string, campusId: number) {
     const rows = await this.db.execute<{
       total_score: number
       rank: number
@@ -452,8 +527,12 @@ export class Repository {
         count(*) filter (where se.type = 'no_bet')::integer as missed_exams
       from pool_predict.leaderboard_totals lt
       left join pool_predict.score_events se
-        on se.pool_id = lt.pool_id and se.user_id = lt.user_id
-      where lt.pool_id = ${poolId}::uuid and lt.user_id = ${userId}::uuid
+        on se.pool_id = lt.pool_id
+       and se.user_id = lt.user_id
+       and se.campus_id = lt.campus_id
+      where lt.pool_id = ${poolId}::uuid
+        and lt.user_id = ${userId}::uuid
+        and lt.campus_id = ${campusId}::integer
       group by lt.total_score, lt.rank
     `)
     return (
@@ -469,7 +548,7 @@ export class Repository {
     )
   }
 
-  async getLeaderboard(poolId: string) {
+  async getLeaderboard(poolId: string, campusId: number) {
     return this.db.execute<{
       user_id: string
       intra_user_id: number
@@ -492,10 +571,14 @@ export class Repository {
         count(*) filter (where se.type = 'exact')::integer as exact_hits,
         count(*) filter (where se.type = 'no_bet')::integer as missed_exams
       from pool_predict.leaderboard_totals lt
-      join pool_predict.app_users u on u.id = lt.user_id
+      join pool_predict.app_users u
+        on u.id = lt.user_id and u.campus_id = lt.campus_id
       left join pool_predict.score_events se
-        on se.pool_id = lt.pool_id and se.user_id = lt.user_id
+        on se.pool_id = lt.pool_id
+       and se.user_id = lt.user_id
+       and se.campus_id = lt.campus_id
       where lt.pool_id = ${poolId}::uuid
+        and lt.campus_id = ${campusId}::integer
       group by lt.user_id, u.intra_user_id, u.created_at, lt.total_score, lt.rank
       order by lt.total_score desc, u.created_at asc, u.intra_user_id asc
     `)

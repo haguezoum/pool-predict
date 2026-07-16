@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { useAuth } from '@/context/auth-context'
 
 export function PlayerProfilePage() {
+  const { user } = useAuth()
   const { intraUserId: intraUserIdParam } = useParams()
   const [searchParams] = useSearchParams()
   const requestedPoolId = searchParams.get('poolId')
   const intraUserId = Number(intraUserIdParam)
   const poolQuery = useQuery({
-    queryKey: ['pool', 'current'],
-    queryFn: api.currentPool,
-    enabled: !requestedPoolId,
+    queryKey: ['pool', user?.campusId, 'current'],
+    queryFn: () => api.currentPool(user!.campusId),
+    enabled: !requestedPoolId && Boolean(user?.campusId),
     staleTime: 5 * 60_000,
   })
   const poolId = requestedPoolId ?? poolQuery.data?.id
@@ -49,7 +51,13 @@ export function PlayerProfilePage() {
       <Button asChild variant="ghost" className="w-fit px-0 hover:bg-transparent">
         <Link to="/leaderboard"><ArrowLeftIcon data-icon="inline-start" /> Back to leaderboard</Link>
       </Button>
-      {poolId ? <PredictionHistory poolId={poolId} intraUserId={intraUserId} /> : null}
+      {poolId && user ? (
+        <PredictionHistory
+          poolId={poolId}
+          campusId={user.campusId}
+          intraUserId={intraUserId}
+        />
+      ) : null}
     </div>
   )
 }

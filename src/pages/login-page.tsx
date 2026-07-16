@@ -20,7 +20,7 @@ export function LoginPage() {
   const error = searchParams.get('error')
   const errorMessage = error
     ? {
-        INELIGIBLE_CAMPUS: 'Only active students from the 1337 MED Tetouan campus can join.',
+        INELIGIBLE_CAMPUS: 'Your primary 42 campus is not enabled for this predictor.',
         POOLER_ACCESS_DENIED: 'Current poolers cannot enter the prediction platform.',
         USER_KIND_NOT_ALLOWED: 'This type of 42 account is not allowed to join.',
         STAFF_ACCESS_DENIED: 'Staff accounts cannot join this student leaderboard.',

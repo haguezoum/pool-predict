@@ -55,38 +55,49 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const POOLER_PROJECTS_CACHE_MS = 5 * 60_000
 
-export function poolerProjectsQueryKey(poolId: string, poolerIntraId: number) {
-  return ['pooler-projects', poolId, poolerIntraId] as const
+function withCampus(path: string, campusId: number) {
+  const separator = path.includes('?') ? '&' : '?'
+  return `${path}${separator}campusId=${encodeURIComponent(campusId)}`
+}
+
+export function poolerProjectsQueryKey(
+  campusId: number,
+  poolId: string,
+  poolerIntraId: number
+) {
+  return ['pooler-projects', campusId, poolId, poolerIntraId] as const
 }
 
 export const api = {
   me: () => request<Viewer>('/api/me'),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
-  currentPool: () => request<PoolView>('/api/pools/current'),
-  pools: () => request<PoolSummary[]>('/api/pools'),
-  pool: (poolId: string) => request<PoolView>(`/api/pools/${poolId}`),
-  poolers: (poolId: string) => request<PoolerView[]>(`/api/pools/${poolId}/poolers`),
-  poolerProjects: (poolId: string, poolerIntraId: number) =>
+  currentPool: (campusId: number) => request<PoolView>(withCampus('/api/pools/current', campusId)),
+  pools: (campusId: number) => request<PoolSummary[]>(withCampus('/api/pools', campusId)),
+  pool: (poolId: string, campusId: number) =>
+    request<PoolView>(withCampus(`/api/pools/${poolId}`, campusId)),
+  poolers: (poolId: string, campusId: number) =>
+    request<PoolerView[]>(withCampus(`/api/pools/${poolId}/poolers`, campusId)),
+  poolerProjects: (poolId: string, poolerIntraId: number, campusId: number) =>
     request<ProjectResultView[]>(
-      `/api/pools/${poolId}/poolers/${poolerIntraId}/projects`
+      withCampus(`/api/pools/${poolId}/poolers/${poolerIntraId}/projects`, campusId)
     ),
-  myBets: (poolId: string) =>
-    request<BetView[]>(`/api/bets/mine?poolId=${encodeURIComponent(poolId)}`),
-  predictionHistory: (poolId: string, intraUserId: number) =>
+  myBets: (poolId: string, campusId: number) =>
+    request<BetView[]>(withCampus(`/api/bets/mine?poolId=${encodeURIComponent(poolId)}`, campusId)),
+  predictionHistory: (poolId: string, intraUserId: number, campusId: number) =>
     request<PredictionHistoryView>(
-      `/api/pools/${encodeURIComponent(poolId)}/users/${intraUserId}/predictions`
+      withCampus(`/api/pools/${encodeURIComponent(poolId)}/users/${intraUserId}/predictions`, campusId)
     ),
-  saveBet: (examId: string, poolerIntraId: number, input: BetInput) =>
-    request<BetView>(`/api/bets/${examId}/${poolerIntraId}`, {
+  saveBet: (examId: string, poolerIntraId: number, campusId: number, input: BetInput) =>
+    request<BetView>(withCampus(`/api/bets/${examId}/${poolerIntraId}`, campusId), {
       method: 'PUT',
       body: JSON.stringify(input),
     }),
-  deleteBet: (examId: string, poolerIntraId: number) =>
-    request<void>(`/api/bets/${examId}/${poolerIntraId}`, { method: 'DELETE' }),
-  revealedBets: (examId: string) =>
-    request<RevealedBetView[]>(`/api/exams/${examId}/revealed-bets`),
-  leaderboard: (poolId?: string) =>
+  deleteBet: (examId: string, poolerIntraId: number, campusId: number) =>
+    request<void>(withCampus(`/api/bets/${examId}/${poolerIntraId}`, campusId), { method: 'DELETE' }),
+  revealedBets: (examId: string, campusId: number) =>
+    request<RevealedBetView[]>(withCampus(`/api/exams/${examId}/revealed-bets`, campusId)),
+  leaderboard: (campusId: number, poolId?: string) =>
     request<LeaderboardEntry[]>(
-      `/api/leaderboard${poolId ? `?poolId=${encodeURIComponent(poolId)}` : ''}`
+      withCampus(`/api/leaderboard${poolId ? `?poolId=${encodeURIComponent(poolId)}` : ''}`, campusId)
     ),
 }

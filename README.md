@@ -24,7 +24,7 @@ The first successful login enrolls a student in the current pool. Missed-exam pe
 
 The browser only calls `/api`. It never receives a database credential, 42 client secret, user OAuth access token, or Supabase secret. The API exchanges the 42 authorization code, verifies `/v2/me`, creates a hashed local session, and discards the OAuth token.
 
-Only internal IDs, 42 numeric references, pool/exam timestamps, bets, score events, totals/ranks, and sync metadata are stored. Names, logins, avatars, campus/cursus objects, pooler profiles, 42 payloads, and final marks stay live in 42 and are not copied to Supabase.
+Only internal IDs, campus IDs, 42 numeric references, pool/exam timestamps, bets, score events, totals/ranks, and sync metadata are stored. Names, logins, avatars, campus/cursus objects, pooler profiles, 42 payloads, and final marks stay live in 42 and are not copied to Supabase.
 
 ## Local setup
 
@@ -66,9 +66,9 @@ Access policy values are server-only and comma-separated where applicable:
 
 - `FORTY_TWO_ALLOWED_KINDS` accepts the 42 API `kind` values `admin`, `student`, and `external`. All three are enabled by default. Alumni and staff flags do not redefine the API kind.
 - `FORTY_TWO_ALLOW_POOLERS` accepts `yes`/`no`, `true`/`false`, or `1`/`0`. The default is `no`.
-- `FORTY_TWO_ALLOWED_CAMPUS_IDS` accepts additional numeric primary-campus IDs such as `993,444`. The dynamically discovered Tetouan pool campus is always included.
+- `FORTY_TWO_ALLOWED_CAMPUS_IDS` accepts additional numeric primary-campus IDs. Known 1337 campuses include Khouribga `16`, Benguerir `21`, Tetouan/MED `55`, and Rabat `75`. The default campus configured by `FORTY_TWO_TETOUAN_CAMPUS_ID` is always included.
 
-These variables control who may bet on the Tetouan pool; they do not change which campus Piscine is used as the prediction target.
+Each authenticated student is bound to their primary 42 campus. Pool discovery, the five-minute 42 cache, poolers, bets, prediction history, score events, and leaderboard queries are partitioned by that `campus_id`. A student can only bet on poolers returned by the same-campus Piscine roster. Composite PostgreSQL foreign keys enforce the same boundary for stored writes, so adding an allowed campus cannot mix it into another campus leaderboard.
 
 `APP_ORIGIN` is optional on Vercel because the API derives it from `VERCEL_PROJECT_PRODUCTION_URL`. All secrets must still be configured in the Vercel project; local `.env` files are never uploaded by Git deployments.
 

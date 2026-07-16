@@ -14,6 +14,7 @@ const env: Env = {
   clientId: 'client-id',
   clientSecret: 'client-secret',
   redirectUri: 'http://localhost:5173/api/auth/42/callback',
+  campusId: 55,
   allowedKinds: ['student'],
   allowedCampusIds: [],
   allowPoolers: false,
@@ -75,8 +76,28 @@ describe('Express API boundary', () => {
     expect(response.body.error).toBe('UNAUTHENTICATED')
   })
 
+  it('rejects API requests for another campus before reading pool data', async () => {
+    const getLatestPool = vi.fn()
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({
+        user: { id: 'user-id', intraUserId: 42, campusId: 55 },
+      }),
+      getLatestPool,
+    } as unknown as Repository
+    const app = createApp({ env, repository, fortyTwo: {} as FortyTwoClient })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/leaderboard?campusId=16')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(403)
+    expect(response.body.error).toBe('CROSS_CAMPUS_ACCESS')
+    expect(getLatestPool).not.toHaveBeenCalled()
+  })
+
   it('returns the signed-in viewer without synchronizing or settling the live pool', async () => {
-    const user = { id: 'user-id', intraUserId: 42 }
+    const user = { id: 'user-id', intraUserId: 42, campusId: 55 }
     const repository = {
       getSession: vi.fn().mockResolvedValue({ user }),
       listUserPools: vi.fn().mockResolvedValue([{ pool: { id: 'pool-id' } }]),
@@ -121,7 +142,7 @@ describe('Express API boundary', () => {
   })
 
   it('loads poolers without requesting results for exams that are still open', async () => {
-    const user = { id: 'user-id', intraUserId: 7 }
+    const user = { id: 'user-id', intraUserId: 7, campusId: 55 }
     const now = Date.now()
     const snapshot: LivePoolSnapshot = {
       externalRef: 'piscine-c:55:2026-07-06',
@@ -177,7 +198,7 @@ describe('Express API boundary', () => {
   })
 
   it('loads a pooler project history only from the live 42 source', async () => {
-    const user = { id: 'user-id', intraUserId: 7 }
+    const user = { id: 'user-id', intraUserId: 7, campusId: 55 }
     const snapshot: LivePoolSnapshot = {
       externalRef: 'piscine-c:55:2026-07-06',
       campusId: 55,
@@ -213,10 +234,11 @@ describe('Express API boundary', () => {
   })
 
   it('reads the leaderboard without blocking on a live pool synchronization', async () => {
-    const user = { id: 'user-id', intraUserId: 7 }
+    const user = { id: 'user-id', intraUserId: 7, campusId: 55 }
     const repository = {
       getSession: vi.fn().mockResolvedValue({ user }),
       getLatestPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [] }),
+      getPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id', campusId: 55 }, exams: [] }),
       rebuildLeaderboard: vi.fn().mockResolvedValue(undefined),
       getLeaderboard: vi.fn().mockResolvedValue([]),
     } as unknown as Repository
@@ -234,13 +256,13 @@ describe('Express API boundary', () => {
     expect(response.status).toBe(200)
     expect(response.body).toEqual([])
     expect(fortyTwo.getCurrentPool).not.toHaveBeenCalled()
-    expect(repository.rebuildLeaderboard).toHaveBeenCalledWith('pool-id')
+    expect(repository.rebuildLeaderboard).toHaveBeenCalledWith('pool-id', 55)
   })
 
   it('shows another player predictions only for exams that have ended', async () => {
     const now = Date.now()
-    const viewer = { id: 'viewer-id', intraUserId: 7 }
-    const target = { id: 'target-id', intraUserId: 8 }
+    const viewer = { id: 'viewer-id', intraUserId: 7, campusId: 55 }
+    const target = { id: 'target-id', intraUserId: 8, campusId: 55 }
     const endedExam = {
       id: 'ended-exam',
       poolId: 'pool-id',
@@ -310,7 +332,7 @@ describe('Express API boundary', () => {
   })
 
   it('keeps revealed predictions private until the exam has ended', async () => {
-    const user = { id: 'user-id', intraUserId: 7 }
+    const user = { id: 'user-id', intraUserId: 7, campusId: 55 }
     const repository = {
       getSession: vi.fn().mockResolvedValue({ user }),
       getExam: vi.fn().mockResolvedValue({

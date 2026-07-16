@@ -25,17 +25,19 @@ function initials(name: string) {
 
 type PredictionHistoryProps = {
   poolId: string
+  campusId: number
   intraUserId: number
   initialData?: PredictionHistoryView
 }
 
 type PredictionCardProps = {
   poolId: string
+  campusId: number
   prediction: PredictionHistoryEntryView
   editable: boolean
 }
 
-function PredictionCard({ poolId, prediction, editable }: PredictionCardProps) {
+function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCardProps) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [decision, setDecision] = useState<Prediction>(prediction.prediction)
@@ -43,15 +45,15 @@ function PredictionCard({ poolId, prediction, editable }: PredictionCardProps) {
 
   async function refreshPredictions() {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['prediction-history', poolId] }),
-      queryClient.invalidateQueries({ queryKey: ['bets', poolId] }),
+      queryClient.invalidateQueries({ queryKey: ['prediction-history', campusId, poolId] }),
+      queryClient.invalidateQueries({ queryKey: ['bets', campusId, poolId] }),
     ])
   }
 
   const saveMutation = useMutation({
     mutationFn: () => {
       const predictedScore = decision === 'validate' ? Number(score) : null
-      return api.saveBet(prediction.examId, prediction.poolerIntraId, {
+      return api.saveBet(prediction.examId, prediction.poolerIntraId, campusId, {
         prediction: decision,
         predictedScore,
       })
@@ -63,7 +65,7 @@ function PredictionCard({ poolId, prediction, editable }: PredictionCardProps) {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteBet(prediction.examId, prediction.poolerIntraId),
+    mutationFn: () => api.deleteBet(prediction.examId, prediction.poolerIntraId, campusId),
     onSuccess: refreshPredictions,
   })
 
@@ -189,10 +191,10 @@ function PredictionCard({ poolId, prediction, editable }: PredictionCardProps) {
   )
 }
 
-export function PredictionHistory({ poolId, intraUserId, initialData }: PredictionHistoryProps) {
+export function PredictionHistory({ poolId, campusId, intraUserId, initialData }: PredictionHistoryProps) {
   const historyQuery = useQuery({
-    queryKey: ['prediction-history', poolId, intraUserId],
-    queryFn: () => api.predictionHistory(poolId, intraUserId),
+    queryKey: ['prediction-history', campusId, poolId, intraUserId],
+    queryFn: () => api.predictionHistory(poolId, intraUserId, campusId),
     initialData,
     staleTime: 5 * 60_000,
   })
@@ -260,6 +262,7 @@ export function PredictionHistory({ poolId, intraUserId, initialData }: Predicti
             <PredictionCard
               key={prediction.id}
               poolId={poolId}
+              campusId={campusId}
               prediction={prediction}
               editable={isViewer && !prediction.examEnded}
             />

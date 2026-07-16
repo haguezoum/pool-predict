@@ -10,6 +10,7 @@ export type Viewer = {
   displayName: string
   avatarUrl: string
   campus: string
+  campusId: number
   totalScore: number
   rank: number
   predictions: number
@@ -32,6 +33,7 @@ export type ExamView = {
 export type PoolView = {
   id: string
   externalRef: string
+  campusId: number
   startsAt: string
   endsAt: string
   status: 'upcoming' | 'open' | 'settling' | 'closed'
@@ -42,7 +44,7 @@ export type PoolView = {
 
 export type PoolSummary = Pick<
   PoolView,
-  'id' | 'externalRef' | 'startsAt' | 'endsAt' | 'status'
+  'id' | 'externalRef' | 'campusId' | 'startsAt' | 'endsAt' | 'status'
 >
 
 export type ExamResultView = {
@@ -52,6 +54,7 @@ export type ExamResultView = {
 }
 
 export type PoolerView = {
+  campusId: number
   intraUserId: number
   login: string
   displayName: string
@@ -70,6 +73,7 @@ export type ProjectResultView = {
 
 export type BetView = {
   id: string
+  campusId: number
   examId: string
   poolerIntraId: number
   prediction: Prediction
@@ -104,6 +108,7 @@ export type PredictionHistoryView = {
 }
 
 export type LeaderboardEntry = {
+  campusId: number
   rank: number
   intraUserId: number
   login: string

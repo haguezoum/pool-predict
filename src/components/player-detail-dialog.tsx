@@ -26,24 +26,28 @@ function initials(name: string) {
 type PlayerDetailDialogProps = {
   match: Match
   poolId: string
+  campusId: number
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function PlayerDetailDialog({ match, poolId, open, onOpenChange }: PlayerDetailDialogProps) {
+export function PlayerDetailDialog({
+  match,
+  poolId,
+  campusId,
+  open,
+  onOpenChange,
+}: PlayerDetailDialogProps) {
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false)
   const projectsQuery = useQuery({
-    queryKey: poolerProjectsQueryKey(poolId, match.intraUserId),
-    queryFn: () => api.poolerProjects(poolId, match.intraUserId),
+    queryKey: poolerProjectsQueryKey(campusId, poolId, match.intraUserId),
+    queryFn: () => api.poolerProjects(poolId, match.intraUserId, campusId),
     enabled: open,
     staleTime: POOLER_PROJECTS_CACHE_MS,
   })
 
   useEffect(() => {
-    if (!open) {
-      setAvatarPreviewOpen(false)
-      return
-    }
+    if (!open) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKeyDown = (event: KeyboardEvent) => {

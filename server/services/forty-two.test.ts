@@ -132,6 +132,69 @@ describe('Piscine cohort selection', () => {
 })
 
 describe('42 pool discovery', () => {
+  it('isolates the five-minute pool cache by campus ID', async () => {
+    const beginAt = new Date().toISOString()
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/oauth/token') {
+        return Response.json({ access_token: 'app-token', expires_in: 7_200 })
+      }
+      if (url.pathname === '/v2/cursus') {
+        return Response.json([{ id: 9, slug: 'c-piscine', name: 'C Piscine', kind: 'piscine' }])
+      }
+      if (url.pathname === '/v2/cursus/9/cursus_users') {
+        const campusId = Number(url.searchParams.get('filter[campus_id]'))
+        return Response.json([{
+          id: campusId,
+          begin_at: beginAt,
+          end_at: null,
+          level: 1,
+          user: { id: campusId, login: `pooler-${campusId}` },
+        }])
+      }
+      if (url.pathname === '/v2/users') {
+        const id = Number(url.searchParams.get('filter[id]'))
+        return Response.json([{ id, login: `pooler-${id}`, kind: 'student' }])
+      }
+      if (/^\/v2\/campus\/\d+\/cursus\/9\/exams$/.test(url.pathname)) {
+        return Response.json([])
+      }
+      if (url.pathname === '/v2/cursus/9/projects') return Response.json([])
+      return new Response('Unexpected 42 request', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const env: Env = {
+      nodeEnv: 'test',
+      appOrigin: 'http://localhost:5173',
+      apiPort: 3001,
+      clientId: 'client',
+      clientSecret: 'secret',
+      redirectUri: 'http://localhost:5173/api/auth/42/callback',
+      campusId: 55,
+      allowedKinds: ['student'],
+      allowedCampusIds: [16],
+      allowPoolers: false,
+      databaseUrl: 'postgres://unused',
+      databaseRole: 'pool_predict_api',
+      sessionSecret: 'test-session-secret-long-enough',
+    }
+    const client = new FortyTwoClient(env)
+
+    const [med, khouribga] = await Promise.all([
+      client.getCurrentPool(55),
+      client.getCurrentPool(16),
+    ])
+    const medCached = await client.getCurrentPool(55)
+
+    expect(med.campusId).toBe(55)
+    expect(khouribga.campusId).toBe(16)
+    expect(medCached).toBe(med)
+    const rosterRequests = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/v2/cursus/9/cursus_users')
+    )
+    expect(rosterRequests).toHaveLength(2)
+  })
+
   it('coalesces concurrent discovery requests into one 42 request graph', async () => {
     const beginAt = new Date().toISOString()
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -183,8 +246,8 @@ describe('42 pool discovery', () => {
     const client = new FortyTwoClient(env)
 
     const [first, second] = await Promise.all([
-      client.getCurrentPool(),
-      client.getCurrentPool(),
+      client.getCurrentPool(55),
+      client.getCurrentPool(55),
     ])
     const cachedUsers = await client.getUsers([42])
 

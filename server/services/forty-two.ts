@@ -44,13 +44,6 @@ export type FortyTwoUser = {
   }>
 }
 
-type Campus = {
-  id: number
-  name: string
-  display_name?: string
-  city?: string
-}
-
 type Cursus = { id: number; slug?: string; name?: string; kind?: string }
 
 type CursusUser = {
@@ -286,15 +279,19 @@ function userKind(user: FortyTwoUser): UserKind | null {
   return USER_KINDS.find((candidate) => candidate === kind) ?? null
 }
 
+export function primaryCampusId(user: FortyTwoUser) {
+  return user.campus_users?.find((entry) => entry.is_primary)?.campus_id ?? null
+}
+
 export function isEligibleUser(
   user: FortyTwoUser,
   policy: EligibilityPolicy,
   activePoolerIds: ReadonlySet<number>
 ) {
-  const primaryCampus = user.campus_users?.find((entry) => entry.is_primary)
+  const campusId = primaryCampusId(user)
   const kind = userKind(user)
 
-  if (!primaryCampus || !policy.allowedCampusIds.has(primaryCampus.campus_id)) {
+  if (!campusId || !policy.allowedCampusIds.has(campusId)) {
     return { eligible: false, reason: 'INELIGIBLE_CAMPUS' } as const
   }
   if (!kind || !policy.allowedKinds.has(kind)) {
@@ -308,8 +305,8 @@ export function isEligibleUser(
 
 export class FortyTwoClient {
   private appToken: { value: string; expiresAt: number } | null = null
-  private poolCache: { value: LivePoolSnapshot; expiresAt: number } | null = null
-  private poolDiscovery: Promise<LivePoolSnapshot> | null = null
+  private poolCache = new Map<number, CacheEntry<LivePoolSnapshot>>()
+  private poolDiscovery = new Map<number, Promise<LivePoolSnapshot>>()
   private userCache = new Map<number, CacheEntry<FortyTwoUser>>()
   private userRequests = new Map<number, Promise<FortyTwoUser>>()
   private userBatchRequests = new Map<string, Promise<FortyTwoUser[]>>()
@@ -502,41 +499,34 @@ export class FortyTwoClient {
     })
   }
 
-  async getCurrentPool(): Promise<LivePoolSnapshot> {
-    if (this.poolCache && this.poolCache.expiresAt > Date.now()) {
-      return this.poolCache.value
+  async getCurrentPool(campusId: number): Promise<LivePoolSnapshot> {
+    const cached = this.poolCache.get(campusId)
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value
     }
-    if (!this.poolDiscovery) {
-      const discovery = this.discoverCurrentPool()
-      this.poolDiscovery = discovery
+    if (cached) this.poolCache.delete(campusId)
+    let discovery = this.poolDiscovery.get(campusId)
+    if (!discovery) {
+      discovery = this.discoverCurrentPool(campusId)
+      this.poolDiscovery.set(campusId, discovery)
       void discovery
         .finally(() => {
-          if (this.poolDiscovery === discovery) this.poolDiscovery = null
+          if (this.poolDiscovery.get(campusId) === discovery) {
+            this.poolDiscovery.delete(campusId)
+          }
         })
         .catch(() => undefined)
     }
     return withTimeout(
-      this.poolDiscovery,
+      discovery,
       POOL_DISCOVERY_TIMEOUT_MS,
       '42 pool discovery timed out'
     )
   }
 
-  private async discoverCurrentPool(): Promise<LivePoolSnapshot> {
+  private async discoverCurrentPool(campusId: number): Promise<LivePoolSnapshot> {
     const now = new Date()
-    const [campuses, cursus] = await Promise.all([
-      this.env.campusId
-        ? Promise.resolve<Campus[]>([])
-        : this.paginate<Campus>('/v2/campus'),
-      this.paginate<Cursus>('/v2/cursus'),
-    ])
-    const campusId =
-      this.env.campusId ??
-      campuses.find((campus) => {
-        const haystack = `${campus.name} ${campus.display_name ?? ''} ${campus.city ?? ''}`.toLowerCase()
-        return haystack.includes('tetouan') || haystack.includes('tétouan') || haystack.includes('1337 med')
-      })?.id
-    if (!campusId) throw new FortyTwoUnavailableError('Tetouan campus was not found')
+    const cursus = await this.paginate<Cursus>('/v2/cursus')
 
     const piscine = cursus.find((item) => {
       const slug = item.slug?.toLowerCase()
@@ -553,7 +543,9 @@ export class FortyTwoClient {
       now
     )
     const cohort = selectActiveCohort(cursusUsers, now)
-    if (!cohort) throw new FortyTwoUnavailableError('No active Tetouan Piscine C cohort was found')
+    if (!cohort) {
+      throw new FortyTwoUnavailableError(`No active Piscine C cohort was found for campus ${campusId}`)
+    }
 
     const examRange = [
       new Date(cohort.startsAt.getTime() - 24 * 60 * 60 * 1_000).toISOString(),
@@ -643,7 +635,7 @@ export class FortyTwoClient {
       exams,
       projects: poolProjects,
     }
-    this.poolCache = { value: snapshot, expiresAt: Date.now() + POOL_CACHE_MS }
+    this.poolCache.set(campusId, { value: snapshot, expiresAt: Date.now() + POOL_CACHE_MS })
     return snapshot
   }
 
@@ -768,11 +760,13 @@ export class FortyTwoClient {
 }
 
 export function toPublicUser(user: FortyTwoUser) {
+  const campusId = primaryCampusId(user)
   return {
     intraUserId: user.id,
     login: user.login,
     displayName: displayName(user),
     avatarUrl: avatarUrl(user),
+    campusId: campusId ?? 0,
     campus: user.campus?.find((campus) =>
       user.campus_users?.some((entry) => entry.is_primary && entry.campus_id === campus.id)
     )?.name ?? '1337 MED',

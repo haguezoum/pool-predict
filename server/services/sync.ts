@@ -7,8 +7,12 @@ export type SyncedPool = Awaited<ReturnType<Repository['upsertPool']>> & {
   snapshot: LivePoolSnapshot
 }
 
-export async function syncPool(repository: Repository, fortyTwo: FortyTwoClient): Promise<SyncedPool> {
-  const snapshot = await fortyTwo.getCurrentPool()
+export async function syncPool(
+  repository: Repository,
+  fortyTwo: FortyTwoClient,
+  campusId: number
+): Promise<SyncedPool> {
+  const snapshot = await fortyTwo.getCurrentPool(campusId)
   const stored = await repository.upsertPool(snapshot)
   return { ...stored, snapshot }
 }
@@ -23,8 +27,8 @@ export async function settlePool(
   if (!leaseUntil) return
 
   try {
-    await repository.applyNoBetPenalties(synced.pool.id)
-    const bets = await repository.listPoolBets(synced.pool.id)
+    await repository.applyNoBetPenalties(synced.pool.id, synced.snapshot.campusId)
+    const bets = await repository.listPoolBets(synced.pool.id, synced.snapshot.campusId)
     const examById = new Map(synced.exams.map((exam) => [exam.id, exam]))
     const liveExamByCode = new Map(synced.snapshot.exams.map((exam) => [exam.code, exam]))
     const resultsByExam = new Map<ExamCode, Awaited<ReturnType<FortyTwoClient['getExamResults']>>>()
@@ -51,7 +55,7 @@ export async function settlePool(
       await repository.upsertBetScore(bet, outcome)
     }
 
-    await repository.rebuildLeaderboard(synced.pool.id)
+    await repository.rebuildLeaderboard(synced.pool.id, synced.snapshot.campusId)
     await repository.finishSyncLease(leaseKey, leaseUntil)
   } catch (error) {
     await repository.finishSyncLease(leaseKey, leaseUntil, error)
