@@ -12,6 +12,7 @@ import type {
   BetView,
   ExamView,
   LeaderboardEntry,
+  PredictionHistoryView,
   PoolSummary,
   PoolView,
   Viewer,
@@ -168,6 +169,10 @@ function betView(row: Awaited<ReturnType<Repository['listUserBets']>>[number]): 
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
+}
+
+function examHasEnded(exam: ExamRow, now = new Date()) {
+  return now >= (exam.endsAt ?? exam.lockAt)
 }
 
 function accuracy(correct: number, wrong: number) {
@@ -444,6 +449,58 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     })
   )
 
+  app.get(
+    '/api/pools/:poolId/users/:intraUserId/predictions',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const auth = authFrom(res)
+      const poolId = routeParam(req, 'poolId')
+      const intraUserId = z.coerce.number().int().positive().parse(routeParam(req, 'intraUserId'))
+      const stored = await repository.getPool(poolId)
+      if (!stored) throw new ApiError(404, 'POOL_NOT_FOUND', 'Pool not found')
+      const target = await repository.getPoolMemberByIntraId(poolId, intraUserId)
+      if (!target) {
+        throw new ApiError(404, 'PLAYER_NOT_FOUND', 'This player did not join the selected pool')
+      }
+
+      const isViewer = target.id === auth.user.id
+      const now = new Date()
+      const examById = new Map(stored.exams.map((exam) => [exam.id, exam]))
+      const rows = (await repository.listUserBets(target.id, poolId)).filter((bet) => {
+        const exam = examById.get(bet.examId)
+        return Boolean(exam && (isViewer || examHasEnded(exam, now)))
+      })
+      const profileIds = [intraUserId, ...rows.map((row) => row.poolerIntraId)]
+      const profiles = await fortyTwo.getUsers(profileIds)
+      const profileById = new Map(profiles.map((profile) => [profile.id, toPublicUser(profile)]))
+      const targetProfile = profileById.get(intraUserId)
+
+      const response: PredictionHistoryView = {
+        user: {
+          intraUserId,
+          login: targetProfile?.login ?? `user-${intraUserId}`,
+          displayName: targetProfile?.displayName ?? `42 user ${intraUserId}`,
+          avatarUrl: targetProfile?.avatarUrl ?? '',
+        },
+        isViewer,
+        predictions: rows.flatMap((row) => {
+          const exam = examById.get(row.examId)
+          if (!exam) return []
+          const pooler = profileById.get(row.poolerIntraId)
+          return [{
+            ...betView(row),
+            examCode: exam.code,
+            examEnded: examHasEnded(exam, now),
+            poolerLogin: pooler?.login ?? `user-${row.poolerIntraId}`,
+            poolerDisplayName: pooler?.displayName ?? `42 user ${row.poolerIntraId}`,
+            poolerAvatarUrl: pooler?.avatarUrl ?? '',
+          }]
+        }),
+      }
+      res.json(response)
+    })
+  )
+
   app.put(
     '/api/bets/:examId/:pooler42Id',
     requireAuth,
@@ -492,8 +549,8 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     asyncHandler(async (req, res) => {
       const exam = await repository.getExam(routeParam(req, 'examId'))
       if (!exam) throw new ApiError(404, 'EXAM_NOT_FOUND', 'Exam not found')
-      if (new Date() < exam.lockAt) {
-        throw new ApiError(403, 'BETS_PRIVATE', 'Predictions are private until the exam locks')
+      if (!examHasEnded(exam)) {
+        throw new ApiError(403, 'BETS_PRIVATE', 'Predictions are private until the exam ends')
       }
       const rows = await repository.listExamBets(exam.id)
       const profiles = await fortyTwo.getUsers(rows.map((row) => row.poolerIntraId))

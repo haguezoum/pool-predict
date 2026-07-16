@@ -210,6 +210,105 @@ describe('Express API boundary', () => {
     expect(fortyTwo.getPoolerProjectResults).toHaveBeenCalledWith(snapshot, 42)
   })
 
+  it('shows another player predictions only for exams that have ended', async () => {
+    const now = Date.now()
+    const viewer = { id: 'viewer-id', intraUserId: 7 }
+    const target = { id: 'target-id', intraUserId: 8 }
+    const endedExam = {
+      id: 'ended-exam',
+      poolId: 'pool-id',
+      code: '00' as const,
+      lockAt: new Date(now - 2 * 60 * 60_000),
+      endsAt: new Date(now - 60_000),
+    }
+    const activeExam = {
+      id: 'active-exam',
+      poolId: 'pool-id',
+      code: '01' as const,
+      lockAt: new Date(now - 60_000),
+      endsAt: new Date(now + 60 * 60_000),
+    }
+    const bets = [endedExam, activeExam].map((exam, index) => ({
+      id: `bet-${index}`,
+      poolId: 'pool-id',
+      examId: exam.id,
+      userId: target.id,
+      poolerIntraId: 42 + index,
+      prediction: 'validate' as const,
+      predictedScore: 80 + index,
+      createdAt: new Date(now - 10_000),
+      updatedAt: new Date(now - 5_000),
+    }))
+    const getSession = vi.fn().mockResolvedValue({ user: viewer })
+    const repository = {
+      getSession,
+      getPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [endedExam, activeExam] }),
+      getPoolMemberByIntraId: vi.fn().mockResolvedValue(target),
+      listUserBets: vi.fn().mockResolvedValue(bets),
+    } as unknown as Repository
+    const fortyTwo = {
+      getUsers: vi.fn().mockResolvedValue([
+        { id: 8, login: 'player', displayname: 'Player User' },
+        { id: 42, login: 'pooler', displayname: 'Pooler User' },
+      ]),
+    } as unknown as FortyTwoClient
+    const app = createApp({ env, repository, fortyTwo })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/pools/pool-id/users/8/predictions')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(200)
+    expect(response.body.isViewer).toBe(false)
+    expect(response.body.predictions).toHaveLength(1)
+    expect(response.body.predictions[0]).toMatchObject({
+      examCode: '00',
+      examEnded: true,
+      poolerLogin: 'pooler',
+    })
+
+    getSession.mockResolvedValue({ user: target })
+    const ownResponse = await client
+      .get('/api/pools/pool-id/users/8/predictions')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(ownResponse.status).toBe(200)
+    expect(ownResponse.body.isViewer).toBe(true)
+    expect(ownResponse.body.predictions).toHaveLength(2)
+    expect(ownResponse.body.predictions[1]).toMatchObject({
+      examCode: '01',
+      examEnded: false,
+    })
+  })
+
+  it('keeps revealed predictions private until the exam has ended', async () => {
+    const user = { id: 'user-id', intraUserId: 7 }
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({ user }),
+      getExam: vi.fn().mockResolvedValue({
+        id: 'exam-id',
+        poolId: 'pool-id',
+        lockAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 60_000),
+      }),
+      listExamBets: vi.fn(),
+    } as unknown as Repository
+    const app = createApp({ env, repository, fortyTwo: {} as FortyTwoClient })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/exams/exam-id/revealed-bets')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(403)
+    expect(response.body).toEqual({
+      error: 'BETS_PRIVATE',
+      message: 'Predictions are private until the exam ends',
+    })
+    expect(repository.listExamBets).not.toHaveBeenCalled()
+  })
+
   it('rejects cross-origin state-changing requests', async () => {
     const { app } = testApp()
     const { client } = await localRequest(app)

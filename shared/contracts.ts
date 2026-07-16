@@ -88,6 +88,20 @@ export type RevealedBetView = BetView & {
   poolerLogin: string
 }
 
+export type PredictionHistoryEntryView = BetView & {
+  examCode: ExamCode
+  examEnded: boolean
+  poolerLogin: string
+  poolerDisplayName: string
+  poolerAvatarUrl: string
+}
+
+export type PredictionHistoryView = {
+  user: Pick<Viewer, 'intraUserId' | 'login' | 'displayName' | 'avatarUrl'>
+  isViewer: boolean
+  predictions: PredictionHistoryEntryView[]
+}
+
 export type LeaderboardEntry = {
   rank: number
   intraUserId: number

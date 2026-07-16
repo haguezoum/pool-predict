@@ -3,6 +3,7 @@ import type {
   BetInput,
   BetView,
   LeaderboardEntry,
+  PredictionHistoryView,
   PoolSummary,
   PoolerView,
   PoolView,
@@ -65,6 +66,10 @@ export const api = {
     ),
   myBets: (poolId: string) =>
     request<BetView[]>(`/api/bets/mine?poolId=${encodeURIComponent(poolId)}`),
+  predictionHistory: (poolId: string, intraUserId: number) =>
+    request<PredictionHistoryView>(
+      `/api/pools/${encodeURIComponent(poolId)}/users/${intraUserId}/predictions`
+    ),
   saveBet: (examId: string, poolerIntraId: number, input: BetInput) =>
     request<BetView>(`/api/bets/${examId}/${poolerIntraId}`, {
       method: 'PUT',

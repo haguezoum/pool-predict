@@ -237,6 +237,21 @@ export class Repository {
     return membership ?? null
   }
 
+  async getPoolMemberByIntraId(poolId: string, intraUserId: number) {
+    const [row] = await this.db
+      .select({ user: appUsers })
+      .from(poolMemberships)
+      .innerJoin(appUsers, eq(appUsers.id, poolMemberships.userId))
+      .where(
+        and(
+          eq(poolMemberships.poolId, poolId),
+          eq(appUsers.intraUserId, intraUserId)
+        )
+      )
+      .limit(1)
+    return row?.user ?? null
+  }
+
   async getExam(examId: string) {
     const [exam] = await this.db.select().from(examRefs).where(eq(examRefs.id, examId)).limit(1)
     return exam ?? null

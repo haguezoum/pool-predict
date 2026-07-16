@@ -13,6 +13,9 @@ const LoginPage = lazy(() => import('@/pages/login-page').then((module) => ({ de
 const ProfilePage = lazy(() =>
   import('@/pages/profile-page').then((module) => ({ default: module.ProfilePage }))
 )
+const PlayerProfilePage = lazy(() =>
+  import('@/pages/player-profile-page').then((module) => ({ default: module.PlayerProfilePage }))
+)
 
 function RouteFallback() {
   return (
@@ -35,6 +38,7 @@ export default function App() {
                   <Route index element={<HomePage />} />
                   <Route path="leaderboard" element={<LeaderboardPage />} />
                   <Route path="profile" element={<ProfilePage />} />
+                  <Route path="profile/:intraUserId" element={<PlayerProfilePage />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { TrophyIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -107,12 +108,18 @@ export function LeaderboardPage() {
                   <span className={cn('flex size-8 items-center justify-center rounded-full text-sm font-bold tabular-nums', rankStyle(entry.rank))}>
                     {entry.rank}
                   </span>
-                  <Avatar className="mx-auto mt-2 size-12">
-                    <AvatarImage src={entry.avatarUrl} alt={entry.login} />
-                    <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
-                  </Avatar>
-                  <CardTitle className="mt-2 text-sm sm:text-base">{entry.displayName}</CardTitle>
-                  <CardDescription>@{entry.login}</CardDescription>
+                  <Link
+                    to={`/profile/${entry.intraUserId}?poolId=${encodeURIComponent(activePoolId ?? '')}`}
+                    aria-label={`Open @${entry.login}'s prediction profile`}
+                    className="group flex flex-col items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Avatar className="mx-auto mt-2 size-12 transition-transform group-hover:scale-105">
+                      <AvatarImage src={entry.avatarUrl} alt={entry.login} />
+                      <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
+                    </Avatar>
+                    <CardTitle className="mt-2 text-sm group-hover:underline sm:text-base">{entry.displayName}</CardTitle>
+                    <CardDescription>@{entry.login}</CardDescription>
+                  </Link>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-1 pt-0">
                   <p className="text-xl font-semibold tabular-nums">{entry.totalScore}</p>
@@ -133,17 +140,23 @@ export function LeaderboardPage() {
               <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
                 {entry.rank}
               </span>
-              <Avatar size="sm">
-                <AvatarImage src={entry.avatarUrl} alt={entry.login} />
-                <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {entry.displayName}
-                  {entry.login === user?.login ? <Badge variant="secondary" className="ml-1.5">You</Badge> : null}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">@{entry.login} · {entry.exactHits} exact</p>
-              </div>
+              <Link
+                to={`/profile/${entry.intraUserId}?poolId=${encodeURIComponent(activePoolId ?? '')}`}
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Open @${entry.login}'s prediction profile`}
+              >
+                <Avatar size="sm">
+                  <AvatarImage src={entry.avatarUrl} alt={entry.login} />
+                  <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium hover:underline">
+                    {entry.displayName}
+                    {entry.login === user?.login ? <Badge variant="secondary" className="ml-1.5">You</Badge> : null}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">@{entry.login} · {entry.exactHits} exact</p>
+                </div>
+              </Link>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold tabular-nums">{entry.totalScore}</p>
                 <p className="text-[0.65rem] text-muted-foreground">{entry.missedExams} missed</p>
@@ -174,7 +187,11 @@ export function LeaderboardPage() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2.5">
+                  <Link
+                    to={`/profile/${entry.intraUserId}?poolId=${encodeURIComponent(activePoolId ?? '')}`}
+                    className="flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Open @${entry.login}'s prediction profile`}
+                  >
                     <Avatar size="sm">
                       <AvatarImage src={entry.avatarUrl} alt={entry.login} />
                       <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
@@ -186,7 +203,7 @@ export function LeaderboardPage() {
                       </span>
                       <span className="text-xs text-muted-foreground">@{entry.login}</span>
                     </div>
-                  </div>
+                  </Link>
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{entry.predictions}</TableCell>
                 <TableCell className="text-right tabular-nums">{entry.exactHits}</TableCell>

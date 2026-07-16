@@ -5,10 +5,12 @@ import { motion } from 'motion/react'
 import {
   CheckIcon,
   EyeIcon,
+  ListChecksIcon,
   Maximize2Icon,
   RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
+  UsersIcon,
   XIcon,
 } from 'lucide-react'
 import type { BetInput, BetView, ExamCode, ExamView, RevealedBetView } from '@shared/contracts'
@@ -17,6 +19,7 @@ import { api, ApiError } from '@/lib/api'
 import type { Match } from '@/types'
 import { FridayLineChart } from '@/components/friday-line-chart'
 import { PlayerDetailDialog } from '@/components/player-detail-dialog'
+import { PredictionHistory } from '@/components/prediction-history'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -34,15 +37,20 @@ function initials(name: string) {
     .toUpperCase()
 }
 
+function examHasEnded(exam: ExamView) {
+  return Date.now() >= new Date(exam.endsAt ?? exam.lockAt).getTime()
+}
+
 function RevealedPredictions({ exam, poolerIntraId }: { exam: ExamView; poolerIntraId: number }) {
+  const ended = examHasEnded(exam)
   const query = useQuery({
     queryKey: ['revealed-bets', exam.id],
     queryFn: () => api.revealedBets(exam.id),
-    enabled: exam.locked,
+    enabled: ended,
     staleTime: 60_000,
   })
   const rows = (query.data ?? []).filter((bet) => bet.poolerIntraId === poolerIntraId)
-  if (!exam.locked) return null
+  if (!ended) return null
 
   return (
     <details className="rounded-lg border border-border px-3 py-2 text-xs">
@@ -245,6 +253,7 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
 
 export function HomePage() {
   const { user } = useAuth()
+  const [activeTab, setActiveTab] = useState<'poolers' | 'predictions'>('poolers')
   const [query, setQuery] = useState('')
   const [selectedCode, setSelectedCode] = useState<ExamCode>('00')
 
@@ -352,73 +361,106 @@ export function HomePage() {
         </p>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {pool.exams.map((exam) => (
-            <Button
-              key={exam.id}
-              type="button"
-              size="sm"
-              variant={exam.code === selectedExam?.code ? 'default' : 'outline'}
-              onClick={() => setSelectedCode(exam.code)}
-            >
-              Exam {exam.code}
-            </Button>
-          ))}
-        </div>
-      </section>
+      <div
+        role="tablist"
+        aria-label="Pool views"
+        className="flex w-fit items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
+      >
+        <Button
+          type="button"
+          role="tab"
+          size="sm"
+          variant={activeTab === 'poolers' ? 'default' : 'ghost'}
+          aria-selected={activeTab === 'poolers'}
+          onClick={() => setActiveTab('poolers')}
+        >
+          <UsersIcon data-icon="inline-start" /> Poolers
+        </Button>
+        <Button
+          type="button"
+          role="tab"
+          size="sm"
+          variant={activeTab === 'predictions' ? 'default' : 'ghost'}
+          aria-selected={activeTab === 'predictions'}
+          onClick={() => setActiveTab('predictions')}
+        >
+          <ListChecksIcon data-icon="inline-start" /> My predictions
+        </Button>
+      </div>
 
-      {!pool.sourceAvailable ? (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-          42 is temporarily unavailable. Existing bets and scores are safe, but new betting is paused.
-        </p>
+      {activeTab === 'poolers' ? (
+        <>
+          <section className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {pool.exams.map((exam) => (
+                <Button
+                  key={exam.id}
+                  type="button"
+                  size="sm"
+                  variant={exam.code === selectedExam?.code ? 'default' : 'outline'}
+                  onClick={() => setSelectedCode(exam.code)}
+                >
+                  Exam {exam.code}
+                </Button>
+              ))}
+            </div>
+          </section>
+
+          {!pool.sourceAvailable ? (
+            <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              42 is temporarily unavailable. Existing bets and scores are safe, but new betting is paused.
+            </p>
+          ) : null}
+
+          <section className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold tracking-tight">Poolers</h2>
+                <span className="text-xs text-muted-foreground">{filteredMatches.length} total</span>
+              </div>
+              <div className="relative sm:w-64">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search login or name…"
+                  className="h-9 pl-8"
+                />
+              </div>
+            </div>
+
+            {poolersQuery.isPending ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <Skeleton key={index} className="h-80" />
+                ))}
+              </div>
+            ) : poolersQuery.error ? (
+              <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+                Live pooler data is unavailable. New bets remain paused until 42 responds.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {selectedExam
+                  ? filteredMatches.map((match) => (
+                      <MatchCard
+                        key={`${selectedExam.id}-${match.id}`}
+                        match={match}
+                        poolId={pool.id}
+                        exam={selectedExam}
+                        bet={betsByPooler.get(match.intraUserId)}
+                        sourceAvailable={pool.sourceAvailable}
+                      />
+                    ))
+                  : null}
+              </div>
+            )}
+          </section>
+        </>
+      ) : user ? (
+        <PredictionHistory poolId={pool.id} intraUserId={user.intraUserId} />
       ) : null}
-
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">Poolers</h2>
-            <span className="text-xs text-muted-foreground">{filteredMatches.length} total</span>
-          </div>
-          <div className="relative sm:w-64">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search login or name…"
-              className="h-9 pl-8"
-            />
-          </div>
-        </div>
-
-        {poolersQuery.isPending ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }, (_, index) => (
-              <Skeleton key={index} className="h-80" />
-            ))}
-          </div>
-        ) : poolersQuery.error ? (
-          <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-            Live pooler data is unavailable. New bets remain paused until 42 responds.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {selectedExam
-              ? filteredMatches.map((match) => (
-                  <MatchCard
-                    key={`${selectedExam.id}-${match.id}`}
-                    match={match}
-                    poolId={pool.id}
-                    exam={selectedExam}
-                    bet={betsByPooler.get(match.intraUserId)}
-                    sourceAvailable={pool.sourceAvailable}
-                  />
-                ))
-              : null}
-          </div>
-        )}
-      </section>
     </div>
   )
 }
