@@ -31,6 +31,7 @@ import { getPoolStatus, settlePool, syncPool, type SyncedPool } from './services
 const SESSION_COOKIE = 'pool_predict_session'
 const OAUTH_STATE_COOKIE = 'pool_predict_oauth_state'
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+const PROJECT_RESULTS_CACHE_SECONDS = 5 * 60
 
 type AuthState = {
   user: AppUserRow
@@ -435,6 +436,7 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       if (!synced.snapshot.poolers.some((pooler) => pooler.intraUserId === poolerIntraId)) {
         throw new ApiError(422, 'INVALID_POOLER', 'This user is not a pooler in the current pool')
       }
+      res.set('Cache-Control', `private, max-age=${PROJECT_RESULTS_CACHE_SECONDS}`)
       res.json(await fortyTwo.getPoolerProjectResults(synced.snapshot, poolerIntraId))
     })
   )
@@ -582,15 +584,6 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
     asyncHandler(async (req, res) => {
       const requestedPoolId = typeof req.query.poolId === 'string' ? req.query.poolId : null
       let poolId = requestedPoolId
-      try {
-        const synced = await syncPool(repository, fortyTwo)
-        if (!poolId || poolId === synced.pool.id) {
-          poolId = synced.pool.id
-          await settlePool(repository, fortyTwo, synced)
-        }
-      } catch (error) {
-        if (!(error instanceof FortyTwoUnavailableError)) throw error
-      }
       if (!poolId) {
         const stored = await repository.getLatestPool()
         poolId = stored?.pool.id ?? null

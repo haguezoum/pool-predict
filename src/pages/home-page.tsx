@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, startTransition, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
@@ -13,12 +13,21 @@ import {
   UsersIcon,
   XIcon,
 } from 'lucide-react'
-import type { BetInput, BetView, ExamCode, ExamView, RevealedBetView } from '@shared/contracts'
+import type {
+  BetInput,
+  BetView,
+  ExamView,
+  PredictionHistoryView,
+  RevealedBetView,
+} from '@shared/contracts'
 import { useAuth } from '@/context/auth-context'
-import { api, ApiError } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  POOLER_PROJECTS_CACHE_MS,
+  poolerProjectsQueryKey,
+} from '@/lib/api'
 import type { Match } from '@/types'
-import { FridayLineChart } from '@/components/friday-line-chart'
-import { PlayerDetailDialog } from '@/components/player-detail-dialog'
 import { PredictionHistory } from '@/components/prediction-history'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -27,6 +36,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+
+const POOLER_BATCH_SIZE = 6
+const HIDE_CHARTS_STORAGE_KEY = 'pool-predict:hide-pooler-charts'
+const FridayLineChart = lazy(() =>
+  import('@/components/friday-line-chart').then((module) => ({
+    default: module.FridayLineChart,
+  }))
+)
+const loadPlayerDetailDialog = () => import('@/components/player-detail-dialog')
+const PlayerDetailDialog = lazy(() =>
+  loadPlayerDetailDialog().then((module) => ({
+    default: module.PlayerDetailDialog,
+  }))
+)
 
 function initials(name: string) {
   return name
@@ -86,9 +109,10 @@ type MatchCardProps = {
   exam: ExamView
   bet: BetView | undefined
   sourceAvailable: boolean
+  hideCharts: boolean
 }
 
-function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps) {
+function MatchCard({ match, poolId, exam, bet, sourceAvailable, hideCharts }: MatchCardProps) {
   const queryClient = useQueryClient()
   const [decision, setDecision] = useState<'validate' | 'not_validate' | null>(
     bet?.prediction ?? null
@@ -115,6 +139,15 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
   const disabled = exam.locked || !sourceAvailable || mutation.isPending || deleteMutation.isPending
   const error = mutation.error instanceof ApiError ? mutation.error.message : null
 
+  function prefetchPlayerDetails() {
+    void loadPlayerDetailDialog()
+    void queryClient.prefetchQuery({
+      queryKey: poolerProjectsQueryKey(poolId, match.intraUserId),
+      queryFn: () => api.poolerProjects(poolId, match.intraUserId),
+      staleTime: POOLER_PROJECTS_CACHE_MS,
+    })
+  }
+
   function saveNotValidate() {
     setDecision('not_validate')
     setScore('')
@@ -135,14 +168,23 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
         whileHover={disabled ? undefined : { y: -2 }}
         className="relative z-0 transition-[z-index] hover:z-30 focus-within:z-30"
       >
-        <Card size="sm" className="relative h-full overflow-visible">
+        <Card
+          size="sm"
+          className="relative h-full overflow-visible transition-all duration-[0.4s] ease-in-out"
+        >
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
             className="absolute top-2 right-2 z-10"
             aria-label={`Expand @${match.login} details`}
-            onClick={() => setExpanded(true)}
+            onMouseEnter={prefetchPlayerDetails}
+            onPointerDown={prefetchPlayerDetails}
+            onFocus={prefetchPlayerDetails}
+            onClick={() => {
+              prefetchPlayerDetails()
+              setExpanded(true)
+            }}
           >
             <Maximize2Icon />
           </Button>
@@ -150,7 +192,12 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
           <CardContent className="flex flex-col gap-4 pt-(--card-spacing)">
             <div className="flex items-center gap-3 pr-8">
               <Avatar className="size-14 shrink-0 sm:size-16">
-                <AvatarImage src={match.avatarUrl} alt={match.login} />
+                <AvatarImage
+                  src={match.avatarUrl}
+                  alt={match.login}
+                  loading="lazy"
+                  decoding="async"
+                />
                 <AvatarFallback className="text-base">{initials(match.fullName)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
@@ -173,6 +220,7 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
                 )}
                 onClick={() => setDecision('validate')}
                 disabled={disabled}
+                aria-label={`Predict that @${match.login} validates`}
               >
                 <CheckIcon data-icon="inline-start" /> Validate
               </Button>
@@ -186,6 +234,7 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
                 )}
                 onClick={saveNotValidate}
                 disabled={disabled}
+                aria-label={`Predict that @${match.login} does not validate`}
               >
                 <XIcon data-icon="inline-start" /> Not validate
               </Button>
@@ -238,18 +287,26 @@ function MatchCard({ match, poolId, exam, bet, sourceAvailable }: MatchCardProps
             <RevealedPredictions exam={exam} poolerIntraId={match.intraUserId} />
           </CardContent>
 
-          <CardFooter className="relative z-10 flex-col items-stretch overflow-visible">
-            <FridayLineChart fridays={match.fridays} login={match.login} />
-          </CardFooter>
+          {!hideCharts ? (
+            <CardFooter className="relative z-10 flex-col items-stretch overflow-visible">
+              <Suspense fallback={<Skeleton className="h-36 w-full" />}>
+                <FridayLineChart fridays={match.fridays} login={match.login} />
+              </Suspense>
+            </CardFooter>
+          ) : null}
         </Card>
       </motion.div>
 
-      <PlayerDetailDialog
-        match={match}
-        poolId={poolId}
-        open={expanded}
-        onOpenChange={setExpanded}
-      />
+      {expanded ? (
+        <Suspense fallback={null}>
+          <PlayerDetailDialog
+            match={match}
+            poolId={poolId}
+            open
+            onOpenChange={setExpanded}
+          />
+        </Suspense>
+      ) : null}
     </>
   )
 }
@@ -258,23 +315,35 @@ export function HomePage() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'poolers' | 'predictions'>('poolers')
   const [query, setQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'login' | 'level-desc' | 'level-asc'>('login')
-  const [selectedCode, setSelectedCode] = useState<ExamCode>('00')
+  const [sortBy, setSortBy] = useState<'login' | 'level-desc' | 'level-asc'>('level-desc')
+  const [visiblePoolerCount, setVisiblePoolerCount] = useState(POOLER_BATCH_SIZE)
+  const [hideCharts, setHideCharts] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(HIDE_CHARTS_STORAGE_KEY) === '1'
+  })
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
 
-  const poolQuery = useQuery({ queryKey: ['pool', 'current'], queryFn: api.currentPool })
+  const poolQuery = useQuery({
+    queryKey: ['pool', 'current'],
+    queryFn: api.currentPool,
+    staleTime: 5 * 60_000,
+  })
   const pool = poolQuery.data
   const poolersQuery = useQuery({
     queryKey: ['poolers', pool?.id],
     queryFn: () => api.poolers(pool!.id),
     enabled: Boolean(pool?.id && pool.sourceAvailable),
+    staleTime: 5 * 60_000,
   })
   const betsQuery = useQuery({
     queryKey: ['bets', pool?.id],
     queryFn: () => api.myBets(pool!.id),
     enabled: Boolean(pool?.id),
+    staleTime: 60_000,
   })
 
-  const selectedExam = pool?.exams.find((exam) => exam.code === selectedCode) ?? pool?.exams[0]
+  const selectedExam = pool?.exams.find((exam) => !exam.locked) ?? pool?.exams.at(-1)
   const betsByPooler = useMemo(() => {
     const map = new Map<number, BetView>()
     if (!selectedExam) return map
@@ -321,6 +390,64 @@ export function HomePage() {
     })
   }, [matches, query, sortBy])
 
+  const visibleMatches = filteredMatches.slice(0, visiblePoolerCount)
+  const hasMorePoolers = visibleMatches.length < filteredMatches.length
+
+  const initialPredictionHistory = useMemo<PredictionHistoryView | undefined>(() => {
+    if (!user || !pool || !poolersQuery.data || !betsQuery.data) return undefined
+    const poolerById = new Map(
+      poolersQuery.data.map((pooler) => [pooler.intraUserId, pooler])
+    )
+    const examById = new Map(pool.exams.map((exam) => [exam.id, exam]))
+    return {
+      user: {
+        intraUserId: user.intraUserId,
+        login: user.login,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+      },
+      isViewer: true,
+      predictions: betsQuery.data.flatMap((bet) => {
+        const exam = examById.get(bet.examId)
+        if (!exam) return []
+        const pooler = poolerById.get(bet.poolerIntraId)
+        return [{
+          ...bet,
+          examCode: exam.code,
+          examEnded: examHasEnded(exam),
+          poolerLogin: pooler?.login ?? `user-${bet.poolerIntraId}`,
+          poolerDisplayName: pooler?.displayName ?? `42 user ${bet.poolerIntraId}`,
+          poolerAvatarUrl: pooler?.avatarUrl ?? '',
+        }]
+      }),
+    }
+  }, [betsQuery.data, pool, poolersQuery.data, user])
+
+  useEffect(() => {
+    if (!pool?.id) return
+    void queryClient.invalidateQueries({ queryKey: ['me'], exact: true })
+  }, [pool?.id, queryClient])
+
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!target || !hasMorePoolers || activeTab !== 'poolers') return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return
+        startTransition(() => {
+          setVisiblePoolerCount((count) =>
+            Math.min(count + POOLER_BATCH_SIZE, filteredMatches.length)
+          )
+        })
+      },
+      { rootMargin: '300px 0px' }
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, filteredMatches.length, hasMorePoolers])
+
   if (poolQuery.isPending) {
     return (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -359,17 +486,36 @@ export function HomePage() {
         </Button>
       </section>
 
-      <section className="flex flex-wrap items-end gap-8 sm:gap-12">
-        <p className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">Rank</span>
-          <span className="font-display text-5xl leading-none text-blue-500 sm:text-6xl">#{user?.rank}</span>
-        </p>
-        <p className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">Total score</span>
-          <span className="text-3xl font-semibold tabular-nums text-blue-500 sm:text-4xl">
-            {user?.totalScore.toLocaleString()}
-          </span>
-        </p>
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-end gap-8 sm:gap-12">
+          <p className="flex flex-col gap-0.5">
+            <span className="text-xs text-muted-foreground">Your Rank</span>
+            <span className="font-display text-5xl leading-none text-blue-500 sm:text-6xl">#{user?.rank}</span>
+          </p>
+          <p className="flex flex-col gap-0.5">
+            <span className="text-xs text-muted-foreground">Total score</span>
+            <span className="text-3xl font-semibold tabular-nums text-blue-500 sm:text-4xl">
+              {user?.totalScore.toLocaleString()}
+            </span>
+          </p>
+        </div>
+        <label
+          htmlFor="hide-pooler-charts"
+          className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+        >
+          <input
+            id="hide-pooler-charts"
+            type="checkbox"
+            checked={hideCharts}
+            onChange={(event) => {
+              const next = event.target.checked
+              setHideCharts(next)
+              localStorage.setItem(HIDE_CHARTS_STORAGE_KEY, next ? '1' : '0')
+            }}
+            className="size-4 accent-primary"
+          />
+          Hide charts on all poolers
+        </label>
       </section>
 
       <div
@@ -401,22 +547,6 @@ export function HomePage() {
 
       {activeTab === 'poolers' ? (
         <>
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {pool.exams.map((exam) => (
-                <Button
-                  key={exam.id}
-                  type="button"
-                  size="sm"
-                  variant={exam.code === selectedExam?.code ? 'default' : 'outline'}
-                  onClick={() => setSelectedCode(exam.code)}
-                >
-                  Exam {exam.code}
-                </Button>
-              ))}
-            </div>
-          </section>
-
           {!pool.sourceAvailable ? (
             <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
               42 is temporarily unavailable. Existing bets and scores are safe, but new betting is paused.
@@ -428,13 +558,19 @@ export function HomePage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold tracking-tight">Poolers</h2>
                 <span className="text-xs text-muted-foreground">{filteredMatches.length} total</span>
+                {selectedExam ? (
+                  <span className="text-xs font-medium text-primary">Exam {selectedExam.code}</span>
+                ) : null}
               </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <label htmlFor="pooler-sort" className="sr-only">Sort poolers</label>
                 <select
                   id="pooler-sort"
                   value={sortBy}
-                  onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+                  onChange={(event) => {
+                    setSortBy(event.target.value as typeof sortBy)
+                    setVisiblePoolerCount(POOLER_BATCH_SIZE)
+                  }}
                   className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="login">Login A–Z</option>
@@ -446,7 +582,10 @@ export function HomePage() {
                   <Input
                     type="search"
                     value={query}
-                    onChange={(event) => setQuery(event.target.value)}
+                    onChange={(event) => {
+                      setQuery(event.target.value)
+                      setVisiblePoolerCount(POOLER_BATCH_SIZE)
+                    }}
                     placeholder="Search login or name…"
                     className="h-9 pl-8"
                   />
@@ -465,25 +604,43 @@ export function HomePage() {
                 Live pooler data is unavailable. New bets remain paused until 42 responds.
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {selectedExam
-                  ? filteredMatches.map((match) => (
-                      <MatchCard
-                        key={`${selectedExam.id}-${match.id}`}
-                        match={match}
-                        poolId={pool.id}
-                        exam={selectedExam}
-                        bet={betsByPooler.get(match.intraUserId)}
-                        sourceAvailable={pool.sourceAvailable}
-                      />
-                    ))
-                  : null}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {selectedExam
+                    ? visibleMatches.map((match) => (
+                        <MatchCard
+                          key={`${selectedExam.id}-${match.id}`}
+                          match={match}
+                          poolId={pool.id}
+                          exam={selectedExam}
+                          bet={betsByPooler.get(match.intraUserId)}
+                          sourceAvailable={pool.sourceAvailable}
+                          hideCharts={hideCharts}
+                        />
+                      ))
+                    : null}
+                </div>
+                <div
+                  ref={loadMoreRef}
+                  className="flex min-h-10 items-center justify-center text-xs text-muted-foreground"
+                  aria-live="polite"
+                >
+                  {hasMorePoolers
+                    ? `Showing ${visibleMatches.length} of ${filteredMatches.length} · scroll for more`
+                    : filteredMatches.length > 0
+                      ? `All ${filteredMatches.length} poolers loaded`
+                      : 'No poolers match your search'}
+                </div>
+              </>
             )}
           </section>
         </>
       ) : user ? (
-        <PredictionHistory poolId={pool.id} intraUserId={user.intraUserId} />
+        <PredictionHistory
+          poolId={pool.id}
+          intraUserId={user.intraUserId}
+          initialData={initialPredictionHistory}
+        />
       ) : null}
     </div>
   )

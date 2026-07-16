@@ -46,22 +46,63 @@ export function LoginPage() {
         className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/35 via-slate-950/50 to-slate-950/80"
       />
 
-      <div className="absolute top-4 right-4 z-20 sm:top-6 sm:right-6">
+      <div className="absolute top-4 left-4 z-20 sm:top-6 sm:left-6">
         <ThemeToggle className="bg-black/25 text-white backdrop-blur-sm hover:bg-black/40 hover:text-white" />
       </div>
 
-      <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <img
-            src="/logo.png"
-            alt="1337 Pool"
-            className="size-20 rounded-2xl object-contain shadow-lg shadow-primary/25"
-          />
-          <div className="flex flex-col gap-1.5">
-            <h1 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
-              1337 Pool Predict
-            </h1>
+      <div className="absolute top-4 right-4 z-20 max-w-[min(100%-2rem,20rem)] sm:top-6 sm:right-6 sm:max-w-xs">
+        <div className="rounded-md border border-white/15 bg-black px-3 py-2.5 font-mono text-[11px] leading-relaxed text-white shadow-lg sm:text-xs">
+          <p className="mb-1.5 font-semibold tracking-wide text-white/90">
+            ⚠️ notice for poolers
+          </p>
+          <p className="line-clamp-8 text-md">
+            If anything here feels offensive, or you want your data or profile removed from this
+            platform — including info that comes from the 42 Network API — just reach out with your
+            login.
+          </p>
+          <p className="mt-2">
+            Discord:{' '}
+            <a
+              href="https://discordapp.com/users/ops_up"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-white/40 underline-offset-2 hover:decoration-white"
+            >
+              @ops_up
+            </a>
+            <br />
+            X / Twitter:{' '}
+            <a
+              href="https://x.com/hassan_aguezoum"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-white/40 underline-offset-2 hover:decoration-white"
+            >
+              @hassan_aguezoum
+            </a>
+          </p>
+          <p className="mt-2 text-white/70">
+            Your privacy matters. This app only uses 42 data to run predictions — ask anytime and
+            we&apos;ll take care of it 🤷.
+          </p>
+        </div>
+      </div>
+
+      <div className="relative z-10 mt-28 flex w-full max-w-sm flex-col items-center gap-8 sm:mt-16 md:mt-0">
+        <div className="flex flex-col items-center gap-10 text-center">
+          <div className="flex items-center -mt-20 justify-center gap-3 sm:gap-4">
+            <img
+              src="/wa-validi.webp"
+              alt="1337 Pool"
+              className="h-32 w-auto object-contain object-top -mt-10 sm:h-40"
+            />
+            <span className="font-display text-3xl tracking-wide text-white sm:text-4xl">
+              (1337X BET)
+            </span>
           </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+            1337 Pool Predict
+          </h1>
         </div>
 
         <Card className="w-full bg-card/95 shadow-2xl shadow-black/30 backdrop-blur-md">

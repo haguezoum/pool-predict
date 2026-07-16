@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckIcon, Clock3Icon, PencilIcon, Trash2Icon, XIcon } from 'lucide-react'
-import type { Prediction, PredictionHistoryEntryView } from '@shared/contracts'
+import type {
+  Prediction,
+  PredictionHistoryEntryView,
+  PredictionHistoryView,
+} from '@shared/contracts'
 import { api, ApiError } from '@/lib/api'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +26,7 @@ function initials(name: string) {
 type PredictionHistoryProps = {
   poolId: string
   intraUserId: number
+  initialData?: PredictionHistoryView
 }
 
 type PredictionCardProps = {
@@ -184,11 +189,12 @@ function PredictionCard({ poolId, prediction, editable }: PredictionCardProps) {
   )
 }
 
-export function PredictionHistory({ poolId, intraUserId }: PredictionHistoryProps) {
+export function PredictionHistory({ poolId, intraUserId, initialData }: PredictionHistoryProps) {
   const historyQuery = useQuery({
     queryKey: ['prediction-history', poolId, intraUserId],
     queryFn: () => api.predictionHistory(poolId, intraUserId),
-    staleTime: 60_000,
+    initialData,
+    staleTime: 5 * 60_000,
   })
 
   if (historyQuery.isPending) {

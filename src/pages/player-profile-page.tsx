@@ -13,9 +13,12 @@ export function PlayerProfilePage() {
   const requestedPoolId = searchParams.get('poolId')
   const intraUserId = Number(intraUserIdParam)
   const poolQuery = useQuery({
-    queryKey: requestedPoolId ? ['pool', requestedPoolId] : ['pool', 'current'],
-    queryFn: () => requestedPoolId ? api.pool(requestedPoolId) : api.currentPool(),
+    queryKey: ['pool', 'current'],
+    queryFn: api.currentPool,
+    enabled: !requestedPoolId,
+    staleTime: 5 * 60_000,
   })
+  const poolId = requestedPoolId ?? poolQuery.data?.id
 
   if (!Number.isInteger(intraUserId) || intraUserId <= 0) {
     return (
@@ -28,9 +31,9 @@ export function PlayerProfilePage() {
     )
   }
 
-  if (poolQuery.isPending) return <Skeleton className="h-80" />
+  if (!requestedPoolId && poolQuery.isPending) return <Skeleton className="h-80" />
 
-  if (poolQuery.error) {
+  if (!requestedPoolId && poolQuery.error) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
@@ -46,7 +49,7 @@ export function PlayerProfilePage() {
       <Button asChild variant="ghost" className="w-fit px-0 hover:bg-transparent">
         <Link to="/leaderboard"><ArrowLeftIcon data-icon="inline-start" /> Back to leaderboard</Link>
       </Button>
-      <PredictionHistory poolId={poolQuery.data.id} intraUserId={intraUserId} />
+      {poolId ? <PredictionHistory poolId={poolId} intraUserId={intraUserId} /> : null}
     </div>
   )
 }

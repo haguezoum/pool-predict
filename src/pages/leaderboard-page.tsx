@@ -26,13 +26,17 @@ function initials(name: string) {
 export function LeaderboardPage() {
   const { user } = useAuth()
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null)
-  const poolQuery = useQuery({ queryKey: ['pools'], queryFn: api.pools })
+  const poolQuery = useQuery({
+    queryKey: ['pools'],
+    queryFn: api.pools,
+    staleTime: 5 * 60_000,
+  })
   const activePoolId = selectedPoolId ?? poolQuery.data?.[0]?.id
   const selectedPool = poolQuery.data?.find((pool) => pool.id === activePoolId)
   const leaderboardQuery = useQuery({
-    queryKey: ['leaderboard', activePoolId],
-    queryFn: () => api.leaderboard(activePoolId),
-    enabled: Boolean(activePoolId),
+    queryKey: ['leaderboard', selectedPoolId ?? 'current'],
+    queryFn: () => api.leaderboard(selectedPoolId ?? undefined),
+    staleTime: 2 * 60_000,
   })
   const leaderboard = leaderboardQuery.data ?? []
   const top3 = leaderboard.slice(0, 3)

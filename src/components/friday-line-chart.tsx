@@ -18,6 +18,7 @@ function useChartColors() {
     series: isDark ? '#22c55e' : '#16a34a',
     markStroke: isDark ? '#16a34a' : '#15803d',
     projectSeries: isDark ? '#c084fc' : '#9333ea',
+    examAxis: isDark ? '#f87171' : '#dc2626',
   }
 }
 
@@ -27,20 +28,19 @@ type FridayLineChartProps = {
   login: string
   projectResults?: ProjectResultView[]
   showSeriesControls?: boolean
-  projectStatus?: 'idle' | 'loading' | 'error'
 }
 
-type ProgressPoint =
-  | {
-      key: string
-      kind: 'exam'
-      examIndex: number
-    }
-  | {
-      key: string
-      kind: 'project'
-      project: ProjectResultView
-    }
+function projectAxisLabel(name: string) {
+  return name
+    .replace(/^C Piscine\s+/i, '')
+    .replace(/^Piscine C\s+/i, '')
+    .trim()
+}
+
+/** Compact x-axis labels so MUI's shortenLabels doesn't ellipsize them to "". */
+function examAxisLabel(label: string) {
+  return label.replace(/^Exam\s+/i, '').trim() || label
+}
 
 /**
  * MUI LineChart of Friday results.
@@ -53,7 +53,6 @@ export function FridayLineChart({
   login,
   projectResults = [],
   showSeriesControls = false,
-  projectStatus = 'idle',
 }: FridayLineChartProps) {
   const colors = useChartColors()
   const controlsId = useId()
@@ -63,59 +62,31 @@ export function FridayLineChart({
   for (const project of projectResults) {
     if (project.validated === true) latestValidatedProject = project
   }
-  const progressPoints: ProgressPoint[] = showSeriesControls
-    ? fridays.flatMap((_, examIndex) => [
-        ...projectResults
-          .filter((project) => project.week === examIndex && project.score !== null)
-          .map((project): ProgressPoint => ({
-            key: `project-${project.projectId}`,
-            kind: 'project',
-            project,
-          })),
-        {
-          key: `exam-${examIndex}`,
-          kind: 'exam' as const,
-          examIndex,
-        },
-      ])
-    : fridays.map((_, examIndex) => ({
-        key: `exam-${examIndex}`,
-        kind: 'exam',
-        examIndex,
-      }))
-  const xData = progressPoints.map((point) => point.key)
-  const xLabels = new Map(
-    progressPoints.map((point) => [
-      point.key,
-      point.kind === 'exam'
-        ? !showSeriesControls || showExams
-          ? (fridays[point.examIndex]?.label ?? '')
-          : ''
-        : showProjects && point.project.projectId === latestValidatedProject?.projectId
-          ? point.project.name
-          : '',
-    ]),
+  const projectTimeline = fridays.flatMap((_, examIndex) =>
+    projectResults.filter((project) => project.week === examIndex && project.score !== null),
   )
-  const examData = progressPoints.map((point) =>
-    point.kind === 'exam' ? (fridays[point.examIndex]?.value ?? null) : null,
+  const progressIndexes = Array.from(
+    { length: Math.max(fridays.length, showSeriesControls ? projectTimeline.length : 0) },
+    (_, index) => index,
   )
-  const projectData = progressPoints.map((point) =>
-    point.kind === 'project' ? point.project.score : null,
-  )
+  const examData = progressIndexes.map((index) => fridays[index]?.value ?? null)
+  const projectData = progressIndexes.map((index) => projectTimeline[index]?.score ?? null)
   const examSeriesId = `exams-${login}`
   const projectSeriesId = `projects-${login}`
+  const examAxisId = `exam-axis-${login}`
+  const projectAxisId = `project-axis-${login}`
   const series = [
     ...(!showSeriesControls || showExams
       ? [{
           id: examSeriesId,
           label: showSeriesControls ? 'Exams' : `@${login}`,
           data: examData,
+          xAxisId: showSeriesControls ? examAxisId : undefined,
           connectNulls: true,
           showMark: true,
           color: colors.series,
           valueFormatter: (value: number | null, { dataIndex }: { dataIndex: number }) => {
-            const point = progressPoints[dataIndex]
-            const friday = point?.kind === 'exam' ? fridays[point.examIndex] : undefined
+            const friday = fridays[dataIndex]
             if (value == null || !friday?.validated) return 'Not validated'
             return friday.score ? `Score ${friday.score}` : String(value)
           },
@@ -126,13 +97,14 @@ export function FridayLineChart({
           id: projectSeriesId,
           label: latestValidatedProject?.name ?? 'Projects',
           data: projectData,
+          xAxisId: projectAxisId,
           connectNulls: true,
           showMark: true,
           color: colors.projectSeries,
           valueFormatter: (value: number | null, { dataIndex }: { dataIndex: number }) => {
-            const point = progressPoints[dataIndex]
-            if (value == null || point?.kind !== 'project') return 'No project score'
-            return `${point.project.name} · Score ${value}`
+            const project = projectTimeline[dataIndex]
+            if (value == null || !project) return 'No project score'
+            return `${project.name} · Score ${value}`
           },
         }]
       : []),
@@ -175,33 +147,81 @@ export function FridayLineChart({
           </fieldset>
         ) : null}
       </div>
-      {showSeriesControls && projectStatus !== 'idle' ? (
-        <p className="text-xs text-muted-foreground" role="status">
-          {projectStatus === 'loading'
-            ? 'Loading live project scores…'
-            : 'Project scores are temporarily unavailable.'}
-        </p>
-      ) : null}
-      <Stack sx={{ width: '100%', height: showSeriesControls ? 320 : 140, overflow: 'visible' }}>
+      <Stack
+        sx={{
+          width: '100%',
+          // Card charts need bottom room for x labels; detail chart needs room for 45° project labels
+          height: showSeriesControls ? 380 : 176,
+          overflow: 'visible',
+          '& .MuiChartsSurface-root, & svg, & .MuiChartsAxis-root, & .MuiChartsAxis-tickLabel': {
+            overflow: 'visible',
+          },
+        }}
+      >
         <LineChart
           key={colors.axis}
+          // Card charts: legend steals height and squeezes x labels until MUI ellipsizes them to ""
+          hideLegend={!showSeriesControls}
           xAxis={[
-            {
-              data: xData,
-              scaleType: 'point',
-              height: showSeriesControls ? 88 : 28,
-              valueFormatter: (value: string) => xLabels.get(value) ?? '',
-              tickLabelStyle: {
-                fill: colors.tickLabel,
-                fontSize: 10,
-                ...(showSeriesControls
-                  ? {
-                      angle: -90,
-                      textAnchor: 'end' as const,
-                    }
-                  : {}),
-              },
-            },
+            ...(showSeriesControls
+              ? [
+                  {
+                    id: projectAxisId,
+                    data: progressIndexes,
+                    scaleType: 'point' as const,
+                    position: 'bottom' as const,
+                    height: 'auto' as const,
+                    valueFormatter: (value: number) => {
+                      if (!showProjects) return ''
+                      const project = projectTimeline[value]
+                      return project ? projectAxisLabel(project.name) : ''
+                    },
+                    tickLabelInterval: () => true,
+                    tickLabelMinGap: 0,
+                    tickLabelStyle: {
+                      fill: colors.projectSeries,
+                      fontSize: 9,
+                      fontWeight: 600,
+                      angle: 45,
+                      textAnchor: 'start' as const,
+                      dominantBaseline: 'hanging' as const,
+                    },
+                  },
+                  {
+                    id: examAxisId,
+                    data: progressIndexes,
+                    scaleType: 'point' as const,
+                    position: 'top' as const,
+                    height: 'auto' as const,
+                    valueFormatter: (value: number) => {
+                      if (!showExams) return ''
+                      return examAxisLabel(fridays[value]?.label ?? '')
+                    },
+                    tickLabelInterval: () => true,
+                    tickLabelMinGap: 0,
+                    tickLabelStyle: {
+                      fill: colors.examAxis,
+                      fontSize: 10,
+                      fontWeight: 700,
+                    },
+                  },
+                ]
+              : [
+                  {
+                    data: progressIndexes,
+                    scaleType: 'point' as const,
+                    height: 'auto' as const,
+                    valueFormatter: (value: number) =>
+                      examAxisLabel(fridays[value]?.label ?? ''),
+                    tickLabelInterval: () => true,
+                    tickLabelMinGap: 0,
+                    tickLabelStyle: {
+                      fill: colors.tickLabel,
+                      fontSize: 11,
+                      fontWeight: 600,
+                    },
+                  },
+                ]),
           ]}
           yAxis={[
             {
@@ -216,7 +236,13 @@ export function FridayLineChart({
             },
           ]}
           series={series}
-          margin={{ top: showSeriesControls ? 28 : 12, right: 12, bottom: 4, left: 8 }}
+          margin={{
+            // Edge labels use (margin + axis) as width budget; too small → empty tspans
+            top: showSeriesControls ? 36 : 8,
+            right: showSeriesControls ? 56 : 20,
+            bottom: showSeriesControls ? 8 : 8,
+            left: showSeriesControls ? 8 : 8,
+          }}
           grid={{ horizontal: true }}
           slotProps={{
             legend: showSeriesControls
@@ -247,6 +273,9 @@ export function FridayLineChart({
           sx={{
             width: '100%',
             overflow: 'visible',
+            '& .MuiChartsSurface-root, & svg': {
+              overflow: 'visible',
+            },
             '& .MuiChartsAxis-line': {
               stroke: `${colors.axis} !important`,
               strokeWidth: 1,
@@ -257,7 +286,18 @@ export function FridayLineChart({
             },
             '& .MuiChartsAxis-tickLabel tspan, & .MuiChartsAxis-tickLabel': {
               fill: `${colors.tickLabel} !important`,
+              fontSize: 11,
+              fontWeight: 600,
+            },
+            [`& .MuiChartsAxis-root[data-axis-id="${examAxisId}"] .MuiChartsAxis-tickLabel tspan, & .MuiChartsAxis-root[data-axis-id="${examAxisId}"] .MuiChartsAxis-tickLabel`]: {
+              fill: `${colors.examAxis} !important`,
+              fontWeight: 700,
               fontSize: 10,
+            },
+            [`& .MuiChartsAxis-root[data-axis-id="${projectAxisId}"] .MuiChartsAxis-tickLabel tspan, & .MuiChartsAxis-root[data-axis-id="${projectAxisId}"] .MuiChartsAxis-tickLabel`]: {
+              fill: `${colors.projectSeries} !important`,
+              fontWeight: 600,
+              fontSize: 9,
             },
             '& .MuiChartsGrid-line': {
               stroke: colors.grid,

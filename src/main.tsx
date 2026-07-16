@@ -11,7 +11,9 @@ import App from './App.tsx'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      staleTime: 2 * 60_000,
+      gcTime: 30 * 60_000,
+      refetchOnWindowFocus: false,
       retry: (failureCount, error) => {
         if (error instanceof Error && 'status' in error && error.status === 401) return false
         return failureCount < 2

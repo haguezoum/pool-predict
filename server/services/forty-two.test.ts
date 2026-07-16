@@ -35,6 +35,7 @@ function policy(overrides: {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -185,10 +186,12 @@ describe('42 pool discovery', () => {
       client.getCurrentPool(),
       client.getCurrentPool(),
     ])
+    const cachedUsers = await client.getUsers([42])
 
     expect(first).toBe(second)
     expect(first.poolers).toHaveLength(1)
     expect(first.poolers[0]?.level).toBe(3.14)
+    expect(cachedUsers[0]?.login).toBe('pooler')
     const rosterRequests = fetchMock.mock.calls.filter(([input]) =>
       String(input).includes('/v2/cursus/9/cursus_users')
     )
@@ -198,6 +201,8 @@ describe('42 pool discovery', () => {
 
 describe('42 Piscine project results', () => {
   it('returns current-cohort non-exam project scores grouped by Piscine week', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'))
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input))
       if (url.pathname === '/oauth/token') {
@@ -279,11 +284,91 @@ describe('42 Piscine project results', () => {
       ],
     }
 
-    const results = await new FortyTwoClient(env).getPoolerProjectResults(snapshot, 42)
+    const client = new FortyTwoClient(env)
+    const results = await client.getPoolerProjectResults(snapshot, 42)
+    const cachedResults = await client.getPoolerProjectResults(snapshot, 42)
+    vi.advanceTimersByTime(5 * 60 * 1_000 - 1)
+    const cachedBeforeExpiry = await client.getPoolerProjectResults(snapshot, 42)
+    vi.advanceTimersByTime(2)
+    const refreshedResults = await client.getPoolerProjectResults(snapshot, 42)
 
     expect(results).toEqual([
       { projectId: 100, name: 'C Piscine C 00', validated: true, score: 80, week: 0 },
       { projectId: 101, name: 'C Piscine C 01', validated: true, score: 60, week: 1 },
     ])
+    expect(cachedResults).toBe(results)
+    expect(cachedBeforeExpiry).toBe(results)
+    expect(refreshedResults).not.toBe(results)
+    const projectRequests = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/v2/users/42/projects_users')
+    )
+    expect(projectRequests).toHaveLength(2)
+    const requestUrl = new URL(String(projectRequests[0]?.[0]))
+    expect(requestUrl.searchParams.get('filter[cursus]')).toBe('9')
+    expect(requestUrl.searchParams.get('filter[marked]')).toBe('true')
+  })
+})
+
+describe('42 exam result caching', () => {
+  it('reuses a completed exam result payload across page requests', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/oauth/token') {
+        return Response.json({ access_token: 'app-token', expires_in: 7_200 })
+      }
+      if (url.pathname === '/v2/projects/1301/projects_users') {
+        return Response.json([{
+          id: 1,
+          final_mark: 80,
+          'validated?': true,
+          user: { id: 42, login: 'pooler' },
+        }])
+      }
+      return new Response('Unexpected 42 request', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const env: Env = {
+      nodeEnv: 'test',
+      appOrigin: 'http://localhost:5173',
+      apiPort: 3001,
+      clientId: 'client',
+      clientSecret: 'secret',
+      redirectUri: 'http://localhost:5173/api/auth/42/callback',
+      campusId: 55,
+      allowedKinds: ['admin', 'student', 'external'],
+      allowedCampusIds: [],
+      allowPoolers: false,
+      databaseUrl: 'postgres://unused',
+      databaseRole: 'pool_predict_api',
+      sessionSecret: 'test-session-secret-long-enough',
+    }
+    const snapshot: LivePoolSnapshot = {
+      externalRef: 'piscine-c:55:2026-07-06',
+      campusId: 55,
+      cursusId: 9,
+      startsAt: new Date('2026-07-06T08:30:00.000Z'),
+      endsAt: new Date('2026-08-03T08:30:00.000Z'),
+      poolers: [{ intraUserId: 42, login: 'pooler', displayName: 'Pooler', avatarUrl: '', level: 4.2 }],
+      exams: [],
+      projects: [],
+    }
+    const exam = {
+      code: '00' as const,
+      externalExamId: 1,
+      externalProjectId: 1301,
+      lockAt: new Date('2026-07-10T08:00:00.000Z'),
+      endsAt: new Date('2026-07-10T12:00:00.000Z'),
+    }
+    const client = new FortyTwoClient(env)
+
+    const first = await client.getExamResults(snapshot, exam)
+    const second = await client.getExamResults(snapshot, exam)
+
+    expect(second).toBe(first)
+    expect(second.get(42)).toEqual({ validated: true, score: 80 })
+    const resultRequests = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/v2/projects/1301/projects_users')
+    )
+    expect(resultRequests).toHaveLength(1)
   })
 })

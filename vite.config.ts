@@ -22,5 +22,6 @@ export default defineConfig({
     proxy: {
       '/api': 'http://127.0.0.1:3001',
     },
+    allowedHosts: ['localhost', 'sendable-excellently-augustus.ngrok-free.dev', 'pool-predict.vercel.app'],
   },
 })

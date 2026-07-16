@@ -55,7 +55,7 @@ export class Repository {
     await this.db.execute(sql`select 1 from pool_predict.app_users limit 1`)
   }
 
-  async tryAcquireSyncLease(key: string, leaseSeconds = 90) {
+  async tryAcquireSyncLease(key: string, leaseSeconds = 90, minIntervalSeconds = 60) {
     const rows = await this.db.execute<{ leased_until: Date }>(sql`
       insert into pool_predict.sync_state (key, leased_until, last_error, updated_at)
       values (
@@ -68,8 +68,15 @@ export class Repository {
         leased_until = excluded.leased_until,
         last_error = null,
         updated_at = now()
-      where pool_predict.sync_state.leased_until is null
-         or pool_predict.sync_state.leased_until < now()
+      where (
+        pool_predict.sync_state.leased_until is null
+        or pool_predict.sync_state.leased_until < now()
+      )
+        and (
+          pool_predict.sync_state.cursor is null
+          or pool_predict.sync_state.cursor::timestamptz
+            < now() - make_interval(secs => ${minIntervalSeconds})
+        )
       returning leased_until
     `)
     return rows[0]?.leased_until ?? null
@@ -314,6 +321,23 @@ export class Repository {
 
   async applyNoBetPenalties(poolId: string) {
     await this.db.execute(sql`
+      delete from pool_predict.score_events se
+      using pool_predict.exam_refs e, pool_predict.pool_memberships m
+      where se.pool_id = ${poolId}::uuid
+        and se.type = 'no_bet'::pool_predict.score_event_type
+        and se.exam_id = e.id
+        and m.pool_id = e.pool_id
+        and m.user_id = se.user_id
+        and (
+          coalesce(e.ends_at, e.lock_at) > now()
+          or m.enrolled_at >= e.lock_at
+          or exists (
+            select 1 from pool_predict.bets b
+            where b.exam_id = e.id and b.user_id = m.user_id
+          )
+        )
+    `)
+    await this.db.execute(sql`
       insert into pool_predict.score_events (
         pool_id, user_id, exam_id, type, points, source_key
       )
@@ -327,7 +351,7 @@ export class Repository {
       from pool_predict.exam_refs e
       join pool_predict.pool_memberships m on m.pool_id = e.pool_id
       where e.pool_id = ${poolId}::uuid
-        and e.lock_at <= now()
+        and coalesce(e.ends_at, e.lock_at) <= now()
         and m.enrolled_at < e.lock_at
         and not exists (
           select 1 from pool_predict.bets b

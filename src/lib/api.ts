@@ -53,6 +53,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export const POOLER_PROJECTS_CACHE_MS = 5 * 60_000
+
+export function poolerProjectsQueryKey(poolId: string, poolerIntraId: number) {
+  return ['pooler-projects', poolId, poolerIntraId] as const
+}
+
 export const api = {
   me: () => request<Viewer>('/api/me'),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),

@@ -9,6 +9,12 @@ const EXAM_DURATION_MS = 4 * 60 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 12_000
 const POOL_DISCOVERY_TIMEOUT_MS = 30_000
 const POOL_CACHE_MS = 5 * 60 * 1_000
+const USER_CACHE_MS = 10 * 60 * 1_000
+const ACTIVE_RESULT_CACHE_MS = 60 * 1_000
+const SETTLED_RESULT_CACHE_MS = 10 * 60 * 1_000
+const PROJECT_RESULT_CACHE_MS = 5 * 60 * 1_000
+
+type CacheEntry<T> = { value: T; expiresAt: number }
 
 type ImageShape = {
   link?: string | null
@@ -304,6 +310,13 @@ export class FortyTwoClient {
   private appToken: { value: string; expiresAt: number } | null = null
   private poolCache: { value: LivePoolSnapshot; expiresAt: number } | null = null
   private poolDiscovery: Promise<LivePoolSnapshot> | null = null
+  private userCache = new Map<number, CacheEntry<FortyTwoUser>>()
+  private userRequests = new Map<number, Promise<FortyTwoUser>>()
+  private userBatchRequests = new Map<string, Promise<FortyTwoUser[]>>()
+  private examResultCache = new Map<string, CacheEntry<Map<number, LiveResult>>>()
+  private examResultRequests = new Map<string, Promise<Map<number, LiveResult>>>()
+  private projectResultCache = new Map<string, CacheEntry<LiveProjectResult[]>>()
+  private projectResultRequests = new Map<string, Promise<LiveProjectResult[]>>()
   private readonly env: Env
 
   constructor(env: Env = getEnv()) {
@@ -416,29 +429,77 @@ export class FortyTwoClient {
     return rows
   }
 
+  private cachedUser(intraUserId: number) {
+    const cached = this.userCache.get(intraUserId)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    if (cached) this.userCache.delete(intraUserId)
+    return null
+  }
+
+  private cacheUsers(users: FortyTwoUser[]) {
+    const expiresAt = Date.now() + USER_CACHE_MS
+    for (const user of users) this.userCache.set(user.id, { value: user, expiresAt })
+  }
+
   async getMe(accessToken: string) {
-    return this.request<FortyTwoUser>('/v2/me', accessToken)
+    const user = await this.request<FortyTwoUser>('/v2/me', accessToken)
+    this.cacheUsers([user])
+    return user
   }
 
   async getUser(intraUserId: number) {
-    return this.request<FortyTwoUser>(`/v2/users/${intraUserId}`)
+    const cached = this.cachedUser(intraUserId)
+    if (cached) return cached
+    const pending = this.userRequests.get(intraUserId)
+    if (pending) return pending
+
+    const request = this.request<FortyTwoUser>(`/v2/users/${intraUserId}`).then((user) => {
+      this.cacheUsers([user])
+      return user
+    })
+    this.userRequests.set(intraUserId, request)
+    void request
+      .finally(() => this.userRequests.delete(intraUserId))
+      .catch(() => undefined)
+    return request
   }
 
   async getUsers(intraUserIds: number[]) {
     const uniqueIds = [...new Set(intraUserIds)]
     if (uniqueIds.length === 0) return []
+    const usersById = new Map<number, FortyTwoUser>()
+    const missingIds: number[] = []
+    for (const id of uniqueIds) {
+      const cached = this.cachedUser(id)
+      if (cached) usersById.set(id, cached)
+      else missingIds.push(id)
+    }
     const chunks: number[][] = []
-    for (let index = 0; index < uniqueIds.length; index += 100) {
-      chunks.push(uniqueIds.slice(index, index + 100))
+    for (let index = 0; index < missingIds.length; index += 100) {
+      chunks.push(missingIds.slice(index, index + 100))
     }
     const batches = await Promise.all(
-      chunks.map((chunk) =>
-        this.request<FortyTwoUser[]>(
+      chunks.map((chunk) => {
+        const key = chunk.toSorted((left, right) => left - right).join(',')
+        const pending = this.userBatchRequests.get(key)
+        if (pending) return pending
+        const request = this.request<FortyTwoUser[]>(
           `/v2/users?filter%5Bid%5D=${chunk.join(',')}&page%5Bsize%5D=100`
         )
-      )
+        this.userBatchRequests.set(key, request)
+        void request
+          .finally(() => this.userBatchRequests.delete(key))
+          .catch(() => undefined)
+        return request
+      })
     )
-    return batches.flat()
+    const loadedUsers = batches.flat()
+    this.cacheUsers(loadedUsers)
+    for (const user of loadedUsers) usersById.set(user.id, user)
+    return uniqueIds.flatMap((id) => {
+      const user = usersById.get(id)
+      return user ? [user] : []
+    })
   }
 
   async getCurrentPool(): Promise<LivePoolSnapshot> {
@@ -588,6 +649,27 @@ export class FortyTwoClient {
 
   async getExamResults(snapshot: LivePoolSnapshot, exam: LiveExam) {
     if (!exam.externalProjectId) return new Map<number, LiveResult>()
+    const key = `${snapshot.campusId}:${exam.externalProjectId}`
+    const cached = this.examResultCache.get(key)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    const pending = this.examResultRequests.get(key)
+    if (pending) return pending
+
+    const request = this.loadExamResults(snapshot, exam).then((results) => {
+      const ttl = exam.endsAt.getTime() <= Date.now()
+        ? SETTLED_RESULT_CACHE_MS
+        : ACTIVE_RESULT_CACHE_MS
+      this.examResultCache.set(key, { value: results, expiresAt: Date.now() + ttl })
+      return results
+    })
+    this.examResultRequests.set(key, request)
+    void request
+      .finally(() => this.examResultRequests.delete(key))
+      .catch(() => undefined)
+    return request
+  }
+
+  private async loadExamResults(snapshot: LivePoolSnapshot, exam: LiveExam) {
     const rows = await this.paginate<ProjectUser>(
       `/v2/projects/${exam.externalProjectId}/projects_users?filter%5Bcampus%5D=${snapshot.campusId}`
     )
@@ -613,8 +695,33 @@ export class FortyTwoClient {
       return []
     }
 
+    const key = `${snapshot.externalRef}:${poolerIntraId}`
+    const cached = this.projectResultCache.get(key)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    const pending = this.projectResultRequests.get(key)
+    if (pending) return pending
+
+    const request = this.loadPoolerProjectResults(snapshot, poolerIntraId).then((results) => {
+      this.projectResultCache.set(key, {
+        value: results,
+        expiresAt: Date.now() + PROJECT_RESULT_CACHE_MS,
+      })
+      return results
+    })
+    this.projectResultRequests.set(key, request)
+    void request
+      .finally(() => this.projectResultRequests.delete(key))
+      .catch(() => undefined)
+    return request
+  }
+
+  private async loadPoolerProjectResults(
+    snapshot: LivePoolSnapshot,
+    poolerIntraId: number
+  ): Promise<LiveProjectResult[]> {
+
     const rows = await this.paginate<ProjectUser>(
-      `/v2/users/${poolerIntraId}/projects_users?filter%5Bcursus%5D=${snapshot.cursusId}&sort=updated_at`
+      `/v2/users/${poolerIntraId}/projects_users?filter%5Bcursus%5D=${snapshot.cursusId}&filter%5Bmarked%5D=true&sort=updated_at`
     )
     const projectById = new Map(snapshot.projects.map((project) => [project.id, project]))
     const latestByProject = new Map<number, ProjectUser>()

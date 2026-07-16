@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error
       }
     },
-    staleTime: 15_000,
+    staleTime: 5 * 60_000,
   })
 
   const loginWith42 = useCallback(() => {

@@ -208,7 +208,33 @@ describe('Express API boundary', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual(projectResults)
+    expect(response.headers['cache-control']).toBe('private, max-age=300')
     expect(fortyTwo.getPoolerProjectResults).toHaveBeenCalledWith(snapshot, 42)
+  })
+
+  it('reads the leaderboard without blocking on a live pool synchronization', async () => {
+    const user = { id: 'user-id', intraUserId: 7 }
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({ user }),
+      getLatestPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [] }),
+      rebuildLeaderboard: vi.fn().mockResolvedValue(undefined),
+      getLeaderboard: vi.fn().mockResolvedValue([]),
+    } as unknown as Repository
+    const fortyTwo = {
+      getCurrentPool: vi.fn(),
+      getUsers: vi.fn().mockResolvedValue([]),
+    } as unknown as FortyTwoClient
+    const app = createApp({ env, repository, fortyTwo })
+    const { client } = await localRequest(app)
+
+    const response = await client
+      .get('/api/leaderboard')
+      .set('Cookie', 'pool_predict_session=session-token')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual([])
+    expect(fortyTwo.getCurrentPool).not.toHaveBeenCalled()
+    expect(repository.rebuildLeaderboard).toHaveBeenCalledWith('pool-id')
   })
 
   it('shows another player predictions only for exams that have ended', async () => {

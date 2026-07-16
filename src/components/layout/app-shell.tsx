@@ -104,11 +104,11 @@ export function AppShell() {
                 <SheetHeader className="border-b px-4 py-4 text-left">
                   <SheetTitle className="flex items-center gap-2 font-semibold tracking-tight">
                     <img
-                      src="/logo.png"
+                      src="/wa-validi.webp"
                       alt=""
-                      className="size-8 rounded-lg object-contain"
+                      className="h-12 w-auto shrink-0 object-contain"
                     />
-                    1337 Pool
+                    1337X Bet
                   </SheetTitle>
                 </SheetHeader>
                 <div className="p-3">
@@ -119,14 +119,14 @@ export function AppShell() {
 
             <Link
               to="/"
-              className="flex items-center gap-2 font-semibold tracking-tight"
+              className="flex items-center gap-2.5 font-semibold tracking-tight"
             >
               <img
-                src="/logo.png"
+                src="/wa-validi.webp"
                 alt=""
-                className="size-8 rounded-lg object-contain shadow-sm"
+                className="h-12 w-auto shrink-0 object-contain sm:h-14"
               />
-              <span className="hidden sm:inline">1337 Pool</span>
+              <span className="hidden sm:inline">1337X Bet</span>
             </Link>
           </div>
 
