@@ -60,6 +60,10 @@ export function FridayLineChart({
         : Math.round(scores.reduce((total, score) => total + score, 0) / scores.length),
     }
   })
+  let latestValidatedProject: ProjectResultView | undefined
+  for (const project of projectResults) {
+    if (project.validated === true) latestValidatedProject = project
+  }
   const examSeriesId = `exams-${login}`
   const projectSeriesId = `projects-${login}`
   const series = [
@@ -81,7 +85,7 @@ export function FridayLineChart({
     ...(showSeriesControls && showProjects
       ? [{
           id: projectSeriesId,
-          label: 'Projects',
+          label: latestValidatedProject?.name ?? 'Projects',
           data: projectWeeks.map((week) => week.value),
           connectNulls: true,
           showMark: true,
@@ -139,7 +143,7 @@ export function FridayLineChart({
             : 'Project scores are temporarily unavailable.'}
         </p>
       ) : null}
-      <Stack sx={{ width: '100%', height: showSeriesControls ? 220 : 140, overflow: 'visible' }}>
+      <Stack sx={{ width: '100%', height: showSeriesControls ? 250 : 140, overflow: 'visible' }}>
         <LineChart
           key={colors.axis}
           xAxis={[
@@ -169,6 +173,24 @@ export function FridayLineChart({
           margin={{ top: showSeriesControls ? 28 : 12, right: 12, bottom: 4, left: 8 }}
           grid={{ horizontal: true }}
           slotProps={{
+            legend: showSeriesControls
+              ? {
+                  direction: 'horizontal',
+                  position: { vertical: 'top', horizontal: 'center' },
+                  sx: {
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    rowGap: 0.5,
+                    maxWidth: 180,
+                    '& .MuiChartsLegend-label': {
+                      maxWidth: 150,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    },
+                  },
+                }
+              : undefined,
             tooltip: {
               // Popper portals to body — keep above grid cards
               sx: { zIndex: 9999 },
