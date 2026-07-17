@@ -493,6 +493,11 @@ export class FortyTwoClient {
     const loadedUsers = batches.flat()
     this.cacheUsers(loadedUsers)
     for (const user of loadedUsers) usersById.set(user.id, user)
+    const omittedIds = missingIds.filter((id) => !usersById.has(id))
+    const individuallyLoadedUsers = await Promise.all(
+      omittedIds.map((id) => this.getUser(id))
+    )
+    for (const user of individuallyLoadedUsers) usersById.set(user.id, user)
     return uniqueIds.flatMap((id) => {
       const user = usersById.get(id)
       return user ? [user] : []

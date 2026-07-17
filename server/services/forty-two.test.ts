@@ -131,6 +131,59 @@ describe('Piscine cohort selection', () => {
   })
 })
 
+describe('42 user profiles', () => {
+  it('loads profiles omitted by the bulk response from their individual IDs', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/oauth/token') {
+        return Response.json({ access_token: 'app-token', expires_in: 7_200 })
+      }
+      if (url.pathname === '/v2/users') {
+        return Response.json([{
+          id: 1,
+          login: 'first',
+          displayname: 'First User',
+          image: { link: 'https://cdn.example/first.jpg' },
+        }])
+      }
+      if (url.pathname === '/v2/users/2') {
+        return Response.json({
+          id: 2,
+          login: 'second',
+          displayname: 'Second User',
+          image: { link: 'https://cdn.example/second.jpg' },
+        })
+      }
+      return new Response('Not found', { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const env: Env = {
+      nodeEnv: 'test',
+      appOrigin: 'http://localhost:5173',
+      apiPort: 3001,
+      clientId: 'client',
+      clientSecret: 'secret',
+      redirectUri: 'http://localhost:5173/api/auth/42/callback',
+      campusId: 55,
+      allowedKinds: ['student'],
+      allowedCampusIds: [],
+      allowPoolers: false,
+      databaseUrl: 'postgres://unused',
+      databaseRole: 'pool_predict_api',
+      sessionSecret: 'test-session-secret-long-enough',
+    }
+    const client = new FortyTwoClient(env)
+
+    const profiles = await client.getUsers([1, 2])
+
+    expect(profiles.map((profile) => profile.login)).toEqual(['first', 'second'])
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/v2/users/2'),
+      expect.any(Object)
+    )
+  })
+})
+
 describe('42 pool discovery', () => {
   it('isolates the five-minute pool cache by campus ID', async () => {
     const beginAt = new Date().toISOString()

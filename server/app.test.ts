@@ -268,11 +268,11 @@ describe('Express API boundary', () => {
     const fortyTwo = {
       getCurrentPool: vi.fn(),
       getUsers: vi.fn().mockResolvedValue([
-        { id: 1, login: 'champ', displayname: 'Champion' },
-        { id: 2, login: 'zebra', displayname: 'Zebra' },
-        { id: 3, login: 'alpha', displayname: 'Alpha' },
-        { id: 4, login: 'newer', displayname: 'Newer' },
-        { id: 5, login: 'older', displayname: 'Older' },
+        { id: 1, login: 'champ', displayname: 'Champion', image: { link: 'https://cdn.example/1.jpg' } },
+        { id: 2, login: 'zebra', displayname: 'Zebra', image: { link: 'https://cdn.example/2.jpg' } },
+        { id: 3, login: 'alpha', displayname: 'Alpha', image: { link: 'https://cdn.example/3.jpg' } },
+        { id: 4, login: 'newer', displayname: 'Newer', image: { link: 'https://cdn.example/4.jpg' } },
+        { id: 5, login: 'older', displayname: 'Older', image: { link: 'https://cdn.example/5.jpg' } },
       ]),
     } as unknown as FortyTwoClient
     const app = createApp({ env, repository, fortyTwo })
@@ -291,6 +291,9 @@ describe('Express API boundary', () => {
       'newer',
     ])
     expect(response.body.at(-1)).toMatchObject({ login: 'newer', rank: 0 })
+    expect(response.body.every((entry: { displayName: string; avatarUrl: string }) => (
+      Boolean(entry.displayName && entry.avatarUrl)
+    ))).toBe(true)
     expect(fortyTwo.getCurrentPool).not.toHaveBeenCalled()
     expect(repository.rebuildLeaderboard).toHaveBeenCalledWith('pool-id', 55)
   })
