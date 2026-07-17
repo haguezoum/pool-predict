@@ -174,7 +174,7 @@ describe('42 user profiles', () => {
     }
     const client = new FortyTwoClient(env)
 
-    const profiles = await client.getUsers([1, 2])
+    const profiles = await client.getUsers([1, '2'])
 
     expect(profiles.map((profile) => profile.login)).toEqual(['first', 'second'])
     expect(fetchMock).toHaveBeenCalledWith(

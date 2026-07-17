@@ -563,7 +563,7 @@ export class Repository {
     }>(sql`
       select
         m.user_id,
-        u.intra_user_id,
+        u.intra_user_id::integer as intra_user_id,
         u.created_at,
         coalesce(lt.total_score, 0)::integer as total_score,
         coalesce(lt.rank, 0)::integer as rank,

@@ -461,8 +461,12 @@ export class FortyTwoClient {
     return request
   }
 
-  async getUsers(intraUserIds: number[]) {
-    const uniqueIds = [...new Set(intraUserIds)]
+  async getUsers(intraUserIds: ReadonlyArray<number | string>) {
+    const uniqueIds = [...new Set(
+      intraUserIds
+        .map(Number)
+        .filter((id) => Number.isSafeInteger(id) && id > 0)
+    )]
     if (uniqueIds.length === 0) return []
     const usersById = new Map<number, FortyTwoUser>()
     const missingIds: number[] = []

@@ -61,6 +61,7 @@ describe('Repository', () => {
     const query = execute.mock.calls[0]?.[0]
     const compiled = compiledSql(query)
     expect(compiled).toContain('from pool_predict.pool_memberships m')
+    expect(compiled).toContain('u.intra_user_id::integer as intra_user_id')
     expect(compiled).toContain('left join pool_predict.leaderboard_totals lt')
     expect(compiled).toContain('coalesce(lt.rank, 0)::integer as rank')
     expect(compiled).toContain(
