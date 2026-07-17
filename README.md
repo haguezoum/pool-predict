@@ -1,6 +1,6 @@
-# 1337 Tetouan Pool Predict
+# 1337 Pool Predict
 
-Private Exam 00–03 prediction platform for the 1337 MED Tetouan Piscine. The 42 API user kinds `admin`, `student`, and `external` may sign in by default, while current poolers remain rejected unless explicitly enabled; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
+Private Exam 00–03 prediction platform for the 1337 Piscine. The 42 API user kinds `admin`, `student`, and `external` may sign in by default, while current poolers remain rejected unless explicitly enabled (see .env.examle file) ; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
 
 ## Rules
 
