@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import type { BetInput } from '../../shared/contracts.js'
 import type { Database } from '../db/client.js'
+import type { ScoreOutcome } from '../domain/scoring.js'
 import {
   appUsers,
   bets,
@@ -402,7 +403,7 @@ export class Repository {
     `)
     await this.db.execute(sql`
       insert into pool_predict.score_events (
-        pool_id, user_id, exam_id, campus_id, type, points, source_key
+        pool_id, user_id, exam_id, campus_id, type, points, source_key, rule_version
       )
       select
         e.pool_id,
@@ -411,7 +412,8 @@ export class Repository {
         e.campus_id,
         'no_bet'::pool_predict.score_event_type,
         -2,
-        'no-bet:' || e.id::text || ':' || m.user_id::text
+        'no-bet:' || e.id::text || ':' || m.user_id::text,
+        2
       from pool_predict.exam_refs e
       join pool_predict.pool_memberships m on m.pool_id = e.pool_id
       join pool_predict.pool_refs p on p.id = e.pool_id
@@ -431,7 +433,7 @@ export class Repository {
 
   async upsertBetScore(
     bet: BetRow,
-    outcome: { type: 'exact' | 'correct' | 'wrong'; points: 3 | 1 | -1 } | null
+    outcome: ScoreOutcome | null
   ) {
     const sourceKey = `bet:${bet.id}`
     if (!outcome) {
@@ -449,12 +451,14 @@ export class Repository {
         type: outcome.type,
         points: outcome.points,
         sourceKey,
+        ruleVersion: 2,
       })
       .onConflictDoUpdate({
         target: scoreEvents.sourceKey,
         set: {
           type: outcome.type,
           points: outcome.points,
+          ruleVersion: 2,
           updatedAt: new Date(),
         },
       })

@@ -1,6 +1,7 @@
 import type { Server } from 'node:http'
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { BetInput } from '../shared/contracts.js'
 import { createApp } from './app.js'
 import type { Env } from './env.js'
 import type { FortyTwoClient } from './services/forty-two.js'
@@ -195,6 +196,100 @@ describe('Express API boundary', () => {
       { code: '00', validated: true, score: 80 },
       { code: '01', validated: null, score: null },
     ])
+  })
+
+  it('accepts validation without an exact score while preserving score validation', async () => {
+    const user = { id: 'user-id', intraUserId: 7, campusId: 55 }
+    const now = Date.now()
+    const exam = {
+      id: 'exam-id',
+      poolId: 'pool-id',
+      campusId: 55,
+      code: '00' as const,
+      lockAt: new Date(now + 60 * 60_000),
+      endsAt: new Date(now + 2 * 60 * 60_000),
+    }
+    const snapshot: LivePoolSnapshot = {
+      externalRef: 'piscine-c:55:2026-07-06',
+      campusId: 55,
+      cursusId: 9,
+      startsAt: new Date(now - 7 * 24 * 60 * 60_000),
+      endsAt: new Date(now + 21 * 24 * 60 * 60_000),
+      poolers: [{
+        intraUserId: 42,
+        login: 'pooler',
+        displayName: 'Pooler',
+        avatarUrl: '',
+        level: 4.2,
+      }],
+      projects: [],
+      exams: [{
+        code: '00',
+        externalExamId: 1,
+        externalProjectId: 1301,
+        lockAt: exam.lockAt,
+        endsAt: exam.endsAt,
+      }],
+    }
+    const upsertBet = vi.fn().mockImplementation(
+      (
+        _userId: string,
+        campusId: number,
+        examId: string,
+        poolerIntraId: number,
+        input: BetInput
+      ) => Promise.resolve({
+        id: 'bet-id',
+        campusId,
+        poolId: 'pool-id',
+        examId,
+        userId: user.id,
+        poolerIntraId,
+        prediction: input.prediction,
+        predictedScore: input.predictedScore,
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      })
+    )
+    const repository = {
+      getSession: vi.fn().mockResolvedValue({ user }),
+      getExam: vi.fn().mockResolvedValue(exam),
+      upsertPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [exam] }),
+      upsertBet,
+    } as unknown as Repository
+    const fortyTwo = {
+      getCurrentPool: vi.fn().mockResolvedValue(snapshot),
+    } as unknown as FortyTwoClient
+    const app = createApp({ env, repository, fortyTwo })
+    const { client } = await localRequest(app)
+    const cookie = 'pool_predict_session=session-token'
+
+    const withoutExact = await client
+      .put('/api/bets/exam-id/42?campusId=55')
+      .set('Cookie', cookie)
+      .send({ prediction: 'validate', predictedScore: null })
+    const exactZero = await client
+      .put('/api/bets/exam-id/42?campusId=55')
+      .set('Cookie', cookie)
+      .send({ prediction: 'validate', predictedScore: 0 })
+    const invalidNotValidate = await client
+      .put('/api/bets/exam-id/42?campusId=55')
+      .set('Cookie', cookie)
+      .send({ prediction: 'not_validate', predictedScore: 50 })
+    const outOfRange = await client
+      .put('/api/bets/exam-id/42?campusId=55')
+      .set('Cookie', cookie)
+      .send({ prediction: 'validate', predictedScore: 101 })
+
+    expect(withoutExact.status).toBe(200)
+    expect(withoutExact.body).toMatchObject({ prediction: 'validate', predictedScore: null })
+    expect(exactZero.status).toBe(200)
+    expect(exactZero.body).toMatchObject({ prediction: 'validate', predictedScore: 0 })
+    expect(invalidNotValidate.status).toBe(422)
+    expect(invalidNotValidate.body.error).toBe('VALIDATION_ERROR')
+    expect(outOfRange.status).toBe(422)
+    expect(outOfRange.body.error).toBe('VALIDATION_ERROR')
+    expect(upsertBet).toHaveBeenCalledTimes(2)
   })
 
   it('loads a pooler project history only from the live 42 source', async () => {

@@ -67,12 +67,6 @@ const betInputSchema = z
     predictedScore: z.number().int().min(0).max(100).nullable(),
   })
   .superRefine((value, context) => {
-    if (value.prediction === 'validate' && value.predictedScore === null) {
-      context.addIssue({
-        code: 'custom',
-        message: 'A validated prediction requires an exact score',
-      })
-    }
     if (value.prediction === 'not_validate' && value.predictedScore !== null) {
       context.addIssue({
         code: 'custom',

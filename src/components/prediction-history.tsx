@@ -23,6 +23,10 @@ function initials(name: string) {
     .toUpperCase()
 }
 
+function validationPredictionLabel(predictedScore: number | null) {
+  return predictedScore === null ? 'Validate' : `Validate · exact ${predictedScore}`
+}
+
 type PredictionHistoryProps = {
   poolId: string
   campusId: number
@@ -52,7 +56,8 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const predictedScore = decision === 'validate' ? Number(score) : null
+      const predictedScore =
+        decision === 'validate' && score !== '' ? Number(score) : null
       return api.saveBet(prediction.examId, prediction.poolerIntraId, campusId, {
         prediction: decision,
         predictedScore,
@@ -72,7 +77,8 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
   const parsedScore = Number(score)
   const scoreIsValid =
     decision === 'not_validate' ||
-    (score !== '' && Number.isInteger(parsedScore) && parsedScore >= 0 && parsedScore <= 100)
+    score === '' ||
+    (Number.isInteger(parsedScore) && parsedScore >= 0 && parsedScore <= 100)
   const mutationError =
     saveMutation.error instanceof ApiError
       ? saveMutation.error.message
@@ -106,7 +112,10 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
         <div className="flex items-center justify-between gap-2">
           <p className="flex items-center gap-1.5 text-sm font-semibold">
             {prediction.prediction === 'validate' ? (
-              <><CheckIcon className="size-4 text-emerald-600" /> Validate · {prediction.predictedScore}</>
+              <>
+                <CheckIcon className="size-4 text-emerald-600" />
+                {validationPredictionLabel(prediction.predictedScore)}
+              </>
             ) : (
               <><XIcon className="size-4 text-red-500" /> Not validate</>
             )}
@@ -159,16 +168,21 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
               </Button>
             </div>
             {decision === 'validate' ? (
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                value={score}
-                onChange={(event) => setScore(event.target.value)}
-                aria-label={`Exact score for @${prediction.poolerLogin}`}
-                placeholder="Exact score · 0–100"
-              />
+              <div className="flex flex-col gap-1.5">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={score}
+                  onChange={(event) => setScore(event.target.value)}
+                  aria-label={`Optional exact score for @${prediction.poolerLogin}`}
+                  placeholder="Optional exact score · 0–100"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank for +2. An exact score earns +3 total.
+                </p>
+              </div>
             ) : null}
             <div className="flex gap-2">
               <Button

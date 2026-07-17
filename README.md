@@ -9,8 +9,8 @@ Private Exam 00–03 prediction platform for the 1337 Piscine. The 42 API user k
 ## Rules
 
 - Validated with the exact score: **+3 total**
-- Correct validation outcome with another score: **+1**
-- Correct not-validated prediction: **+1**
+- Correct validation outcome without an exact score or with another score: **+2**
+- Correct not-validated prediction: **+2**
 - Wrong validation outcome: **-1**
 - No predictions at all before an eligible exam locks: one **-2**, settled after the pool closes
 - Unpredicted individual poolers: **0**

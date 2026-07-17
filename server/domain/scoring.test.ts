@@ -9,12 +9,20 @@ describe('scoreBet', () => {
     })
   })
 
-  it('awards +1 for a correct validation with a different score', () => {
-    expect(scoreBet('validate', 80, { validated: true, score: 85 }).points).toBe(1)
+  it('awards +2 for validation without an exact-score prediction', () => {
+    expect(scoreBet('validate', null, { validated: true, score: 85 }).points).toBe(2)
   })
 
-  it('awards +1 for correctly predicting not validated', () => {
-    expect(scoreBet('not_validate', null, { validated: false, score: 35 }).points).toBe(1)
+  it('awards +2 when the validation decision is correct but the exact score is wrong', () => {
+    expect(scoreBet('validate', 80, { validated: true, score: 85 }).points).toBe(2)
+  })
+
+  it('awards +2 when validation is correct but 42 has no usable final score', () => {
+    expect(scoreBet('validate', 80, { validated: true, score: null }).points).toBe(2)
+  })
+
+  it('awards +2 for correctly predicting not validated', () => {
+    expect(scoreBet('not_validate', null, { validated: false, score: 35 }).points).toBe(2)
   })
 
   it.each([

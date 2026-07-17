@@ -64,6 +64,10 @@ function examHasEnded(exam: ExamView) {
   return Date.now() >= new Date(exam.endsAt ?? exam.lockAt).getTime()
 }
 
+function validationPredictionLabel(predictedScore: number | null) {
+  return predictedScore === null ? 'Validate' : `Validate · exact ${predictedScore}`
+}
+
 function RevealedPredictions({
   exam,
   poolerIntraId,
@@ -100,7 +104,7 @@ function RevealedPredictions({
               <span>@{bet.bettorLogin}</span>
               <span className="font-medium">
                 {bet.prediction === 'validate'
-                  ? `Validate · ${bet.predictedScore}`
+                  ? validationPredictionLabel(bet.predictedScore)
                   : 'Not validate'}
               </span>
             </p>
@@ -131,7 +135,9 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
 
   const mutation = useMutation({
     mutationFn: (input: BetInput) => api.saveBet(exam.id, match.intraUserId, campusId, input),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      setDecision(saved.prediction)
+      setScore(saved.predictedScore?.toString() ?? '')
       void queryClient.invalidateQueries({ queryKey: ['bets'] })
     },
   })
@@ -163,11 +169,23 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
     mutation.mutate({ prediction: 'not_validate', predictedScore: null })
   }
 
+  function saveValidate() {
+    if (decision === 'validate') return
+    setDecision('validate')
+    setScore('')
+    mutation.mutate({ prediction: 'validate', predictedScore: null })
+  }
+
   function saveScore(event: React.FormEvent) {
     event.preventDefault()
     const parsed = Number(score)
     if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) return
     mutation.mutate({ prediction: 'validate', predictedScore: parsed })
+  }
+
+  function removeExactScore() {
+    setScore('')
+    mutation.mutate({ prediction: 'validate', predictedScore: null })
   }
 
   return (
@@ -227,7 +245,7 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
                   decision === 'validate' &&
                     'bg-emerald-600 text-white hover:bg-emerald-600/90 dark:bg-emerald-500'
                 )}
-                onClick={() => setDecision('validate')}
+                onClick={saveValidate}
                 disabled={disabled}
                 aria-label={`Predict that @${match.login} validates`}
               >
@@ -252,7 +270,7 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
             {decision === 'validate' && !exam.locked ? (
               <form onSubmit={saveScore} className="flex flex-col gap-2 rounded-lg border p-3">
                 <Label htmlFor={`score-${exam.id}-${match.id}`} className="text-xs">
-                  Exact score · 0–100
+                  Optional exact score · 0–100 · +1 bonus
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -267,16 +285,35 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
                     disabled={disabled}
                   />
                   <Button type="submit" size="sm" disabled={disabled || score === ''}>
-                    {mutation.isPending ? 'Saving…' : 'Save'}
+                    {mutation.isPending ? 'Saving…' : 'Save exact'}
                   </Button>
                 </div>
+                {bet?.prediction === 'validate' && bet.predictedScore !== null ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={removeExactScore}
+                    disabled={disabled}
+                  >
+                    Remove exact score
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {mutation.isPending
+                      ? 'Saving validation-only prediction…'
+                      : 'Validation-only prediction is saved for +2.'}
+                  </p>
+                )}
               </form>
             ) : null}
 
             {bet ? (
               <div className="flex items-center justify-between gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                 <span>
-                  Saved · {bet.prediction === 'validate' ? `score ${bet.predictedScore}` : 'not validate'}
+                  Saved · {bet.prediction === 'validate'
+                    ? validationPredictionLabel(bet.predictedScore)
+                    : 'Not validate'}
                 </span>
                 {!exam.locked ? (
                   <Button

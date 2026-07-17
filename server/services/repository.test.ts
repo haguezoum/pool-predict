@@ -52,6 +52,43 @@ describe('Repository', () => {
     expect(compiled).toContain('and m.campus_id = e.campus_id')
   })
 
+  it('writes settled bets with scoring rule version 2', async () => {
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined)
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate })
+    const insert = vi.fn().mockReturnValue({ values })
+    const repository = new Repository({ insert } as unknown as Database)
+    const now = new Date('2026-07-17T00:00:00.000Z')
+
+    await repository.upsertBetScore({
+      id: 'bet-id',
+      poolId: 'pool-id',
+      examId: 'exam-id',
+      userId: 'user-id',
+      campusId: 55,
+      poolerIntraId: 42,
+      prediction: 'validate',
+      predictedScore: null,
+      createdAt: now,
+      updatedAt: now,
+    }, {
+      type: 'correct',
+      points: 2,
+    })
+
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'correct',
+      points: 2,
+      ruleVersion: 2,
+    }))
+    expect(onConflictDoUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      set: expect.objectContaining({
+        type: 'correct',
+        points: 2,
+        ruleVersion: 2,
+      }),
+    }))
+  })
+
   it('includes unranked pool members after ranked users', async () => {
     const execute = vi.fn().mockResolvedValue([])
     const repository = new Repository({ execute } as unknown as Database)
@@ -114,6 +151,7 @@ describe('Repository', () => {
     expect(insert).toContain("p.ends_at <= now()")
     expect(insert).toContain("e.campus_id = $2::integer")
     expect(insert).toContain("m.enrolled_at < e.lock_at")
+    expect(insert).toContain("source_key, rule_version")
     expect(insert).toContain("on conflict (source_key) do nothing")
   })
 

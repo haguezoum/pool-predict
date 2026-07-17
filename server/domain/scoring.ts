@@ -7,7 +7,7 @@ export type SettledResult = {
 
 export type ScoreOutcome = {
   type: 'exact' | 'correct' | 'wrong'
-  points: 3 | 1 | -1
+  points: 3 | 2 | -1
 }
 
 export function scoreBet(
@@ -30,7 +30,7 @@ export function scoreBet(
     return { type: 'exact', points: 3 }
   }
 
-  return { type: 'correct', points: 1 }
+  return { type: 'correct', points: 2 }
 }
 
 export function noBetPenalty(betCount: number): -2 | 0 {

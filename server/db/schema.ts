@@ -206,7 +206,7 @@ export const scoreEvents = poolPredict.table(
     type: scoreEventTypeEnum('type').notNull(),
     points: smallint('points').notNull(),
     sourceKey: text('source_key').notNull(),
-    ruleVersion: smallint('rule_version').notNull().default(1),
+    ruleVersion: smallint('rule_version').notNull().default(2),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
