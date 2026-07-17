@@ -1,5 +1,9 @@
 # 1337 Pool Predict
 
+<!-- image -->
+
+<img src="https://pool-predict.vercel.app/wa-validi.webp" alt="wa validiiii" width="400" align="center">
+
 Private Exam 00–03 prediction platform for the 1337 Piscine. The 42 API user kinds `admin`, `student`, and `external` may sign in by default, while current poolers remain rejected unless explicitly enabled (see .env.examle file) ; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
 
 ## Rules
