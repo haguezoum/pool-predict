@@ -243,7 +243,7 @@ describe('Express API boundary', () => {
     ) => ({
       user_id: `user-${intraUserId}`,
       intra_user_id: intraUserId,
-      created_at: new Date(createdAt),
+      created_at: createdAt,
       total_score: totalScore,
       rank,
       predictions: 0,

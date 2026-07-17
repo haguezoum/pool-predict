@@ -552,7 +552,7 @@ export class Repository {
     return this.db.execute<{
       user_id: string
       intra_user_id: number
-      created_at: Date
+      created_at: Date | string
       total_score: number
       rank: number
       predictions: number

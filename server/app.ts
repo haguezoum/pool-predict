@@ -647,7 +647,7 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
             missedExams: row.missed_exams,
             accuracy: accuracy(row.correct, row.wrong),
           } satisfies LeaderboardEntry,
-          createdAt: row.created_at.getTime(),
+          createdAt: new Date(row.created_at).getTime(),
         }
       })
       response.sort((left, right) => {
