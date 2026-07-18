@@ -89,6 +89,27 @@ describe('Repository', () => {
     }))
   })
 
+  it('loads persisted outcomes only for the requested user, campus, and pool', async () => {
+    const execute = vi.fn().mockResolvedValue([
+      { bet_id: 'bet-id', type: 'correct' },
+    ])
+    const repository = new Repository({ execute } as unknown as Database)
+
+    const outcomes = await repository.listUserBetOutcomes(
+      '00000000-0000-0000-0000-000000000001',
+      55,
+      '00000000-0000-0000-0000-000000000002'
+    )
+
+    expect(outcomes).toEqual([{ bet_id: 'bet-id', type: 'correct' }])
+    const compiled = compiledSql(execute.mock.calls[0]?.[0])
+    expect(compiled).toContain('se.user_id = $1::uuid')
+    expect(compiled).toContain('se.campus_id = $2::integer')
+    expect(compiled).toContain('se.pool_id = $3::uuid')
+    expect(compiled).toContain('se.bet_id is not null')
+    expect(compiled).toContain("se.type in ( 'exact'")
+  })
+
   it('includes unranked pool members after ranked users', async () => {
     const execute = vi.fn().mockResolvedValue([])
     const repository = new Repository({ execute } as unknown as Database)

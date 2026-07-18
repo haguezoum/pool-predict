@@ -490,7 +490,14 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
       const isViewer = target.id === auth.user.id
       const now = new Date()
       const examById = new Map(stored.exams.map((exam) => [exam.id, exam]))
-      const rows = (await repository.listUserBets(target.id, campusId, poolId)).filter((bet) => {
+      const [storedBets, storedOutcomes] = await Promise.all([
+        repository.listUserBets(target.id, campusId, poolId),
+        repository.listUserBetOutcomes(target.id, campusId, poolId),
+      ])
+      const outcomeByBetId = new Map(
+        storedOutcomes.map((outcome) => [outcome.bet_id, outcome.type])
+      )
+      const rows = storedBets.filter((bet) => {
         const exam = examById.get(bet.examId)
         return Boolean(exam && (isViewer || examHasEnded(exam, now)))
       })
@@ -511,10 +518,21 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
           const exam = examById.get(row.examId)
           if (!exam) return []
           const pooler = profileById.get(row.poolerIntraId)
+          const outcome = outcomeByBetId.get(row.id) ?? null
+          const predictedValidation = row.prediction === 'validate'
+          const actualValidated =
+            outcome === null
+              ? null
+              : outcome === 'wrong'
+                ? !predictedValidation
+                : predictedValidation
           return [{
             ...betView(row),
             examCode: exam.code,
             examEnded: examHasEnded(exam, now),
+            actualValidated,
+            actualScore: outcome === 'exact' ? row.predictedScore : null,
+            outcome,
             poolerLogin: pooler?.login ?? `user-${row.poolerIntraId}`,
             poolerDisplayName: pooler?.displayName ?? `42 user ${row.poolerIntraId}`,
             poolerAvatarUrl: pooler?.avatarUrl ?? '',

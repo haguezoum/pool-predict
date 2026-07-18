@@ -428,6 +428,9 @@ describe('Express API boundary', () => {
       getPool: vi.fn().mockResolvedValue({ pool: { id: 'pool-id' }, exams: [endedExam, activeExam] }),
       getPoolMemberByIntraId: vi.fn().mockResolvedValue(target),
       listUserBets: vi.fn().mockResolvedValue(bets),
+      listUserBetOutcomes: vi.fn().mockResolvedValue([
+        { bet_id: 'bet-0', type: 'correct' },
+      ]),
     } as unknown as Repository
     const fortyTwo = {
       getUsers: vi.fn().mockResolvedValue([
@@ -448,6 +451,9 @@ describe('Express API boundary', () => {
     expect(response.body.predictions[0]).toMatchObject({
       examCode: '00',
       examEnded: true,
+      actualValidated: true,
+      actualScore: null,
+      outcome: 'correct',
       poolerLogin: 'pooler',
     })
 
@@ -462,6 +468,8 @@ describe('Express API boundary', () => {
     expect(ownResponse.body.predictions[1]).toMatchObject({
       examCode: '01',
       examEnded: false,
+      actualValidated: null,
+      outcome: null,
     })
   })
 

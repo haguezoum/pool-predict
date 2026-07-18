@@ -363,6 +363,25 @@ export class Repository {
       .orderBy(asc(bets.createdAt))
   }
 
+  async listUserBetOutcomes(userId: string, campusId: number, poolId: string) {
+    return this.db.execute<{
+      bet_id: string
+      type: 'exact' | 'correct' | 'wrong'
+    }>(sql`
+      select se.bet_id, se.type
+      from pool_predict.score_events se
+      where se.user_id = ${userId}::uuid
+        and se.campus_id = ${campusId}::integer
+        and se.pool_id = ${poolId}::uuid
+        and se.bet_id is not null
+        and se.type in (
+          'exact'::pool_predict.score_event_type,
+          'correct'::pool_predict.score_event_type,
+          'wrong'::pool_predict.score_event_type
+        )
+    `)
+  }
+
   async listExamBets(examId: string, campusId: number) {
     return this.db
       .select()

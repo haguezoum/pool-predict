@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
 function initials(name: string) {
   return name
@@ -34,6 +35,12 @@ function initials(name: string) {
 
 function validationPredictionLabel(predictedScore: number | null) {
   return predictedScore === null ? 'Validate' : `Validate · exact ${predictedScore}`
+}
+
+function actualResultLabel(actualValidated: boolean | null, actualScore: number | null) {
+  if (actualValidated === null) return 'Pending'
+  if (!actualValidated) return 'Not validated'
+  return actualScore === null ? 'Validated' : `Validated · ${actualScore}`
 }
 
 type PredictionHistoryProps = {
@@ -117,21 +124,90 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-sm font-semibold">
-            {prediction.prediction === 'validate' ? (
-              <>
-                <CheckIcon className="size-4 text-emerald-600" />
-                {validationPredictionLabel(prediction.predictedScore)}
-              </>
-            ) : (
-              <><XIcon className="size-4 text-red-500" /> Not validate</>
+        {prediction.examEnded ? (
+          <div
+            className={cn(
+              'grid grid-cols-2 gap-3 rounded-lg border p-3',
+              prediction.outcome === 'wrong' &&
+                'border-red-500/35 bg-red-500/5',
+              (prediction.outcome === 'correct' || prediction.outcome === 'exact') &&
+                'border-emerald-500/35 bg-emerald-500/5'
             )}
-          </p>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock3Icon className="size-3.5" /> {prediction.examEnded ? 'Ended' : 'Open'}
-          </span>
-        </div>
+          >
+            <div className="min-w-0">
+              <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+                Prediction
+              </p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold">
+                {prediction.prediction === 'validate' ? (
+                  <>
+                    <CheckIcon className="size-4 shrink-0" />
+                    <span className="truncate">
+                      {validationPredictionLabel(prediction.predictedScore)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XIcon className="size-4 shrink-0" />
+                    <span className="truncate">Not validate</span>
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="min-w-0 border-l pl-3">
+              <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+                Actual result
+              </p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold">
+                {prediction.actualValidated === true ? (
+                  <CheckIcon className="size-4 shrink-0" />
+                ) : prediction.actualValidated === false ? (
+                  <XIcon className="size-4 shrink-0" />
+                ) : (
+                  <Clock3Icon className="size-4 shrink-0" />
+                )}
+                <span className="truncate">
+                  {actualResultLabel(prediction.actualValidated, prediction.actualScore)}
+                </span>
+              </p>
+            </div>
+            <p
+              className={cn(
+                'col-span-2 flex items-center gap-1.5 border-t pt-2 text-xs font-semibold',
+                prediction.outcome === 'wrong' && 'text-red-600 dark:text-red-400',
+                (prediction.outcome === 'correct' || prediction.outcome === 'exact') &&
+                  'text-emerald-600 dark:text-emerald-400',
+                prediction.outcome === null && 'text-muted-foreground'
+              )}
+            >
+              {prediction.outcome === 'wrong' ? (
+                <><XIcon className="size-3.5" /> Wrong guess</>
+              ) : prediction.outcome === 'exact' ? (
+                <><CheckIcon className="size-3.5" /> Correct · exact score</>
+              ) : prediction.outcome === 'correct' ? (
+                <><CheckIcon className="size-3.5" /> Correct prediction</>
+              ) : (
+                <><Clock3Icon className="size-3.5" /> Result pending</>
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
+              {prediction.prediction === 'validate' ? (
+                <>
+                  <CheckIcon className="size-4 text-emerald-600" />
+                  {validationPredictionLabel(prediction.predictedScore)}
+                </>
+              ) : (
+                <><XIcon className="size-4 text-red-500" /> Not validate</>
+              )}
+            </p>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock3Icon className="size-3.5" /> Open
+            </span>
+          </div>
+        )}
 
         {editable && !editing ? (
           <div className="grid grid-cols-2 gap-2 border-t pt-3">

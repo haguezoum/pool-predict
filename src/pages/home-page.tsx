@@ -68,6 +68,24 @@ function validationPredictionLabel(predictedScore: number | null) {
   return predictedScore === null ? 'Validate' : `Validate · exact ${predictedScore}`
 }
 
+function predictionOutcome(
+  bet: BetView,
+  actualValidated: boolean | null,
+  actualScore: number | null
+): PredictionHistoryView['predictions'][number]['outcome'] {
+  if (actualValidated === null) return null
+  if ((bet.prediction === 'validate') !== actualValidated) return 'wrong'
+  if (
+    actualValidated &&
+    bet.predictedScore !== null &&
+    actualScore !== null &&
+    bet.predictedScore === actualScore
+  ) {
+    return 'exact'
+  }
+  return 'correct'
+}
+
 function RevealedPredictions({
   exam,
   poolerIntraId,
@@ -463,10 +481,16 @@ export function HomePage() {
         const exam = examById.get(bet.examId)
         if (!exam) return []
         const pooler = poolerById.get(bet.poolerIntraId)
+        const result = pooler?.results.find((entry) => entry.code === exam.code)
+        const actualValidated = result?.validated ?? null
+        const actualScore = result?.score ?? null
         return [{
           ...bet,
           examCode: exam.code,
           examEnded: examHasEnded(exam),
+          actualValidated,
+          actualScore,
+          outcome: predictionOutcome(bet, actualValidated, actualScore),
           poolerLogin: pooler?.login ?? `user-${bet.poolerIntraId}`,
           poolerDisplayName: pooler?.displayName ?? `42 user ${bet.poolerIntraId}`,
           poolerAvatarUrl: pooler?.avatarUrl ?? '',

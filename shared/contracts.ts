@@ -96,6 +96,9 @@ export type RevealedBetView = BetView & {
 export type PredictionHistoryEntryView = BetView & {
   examCode: ExamCode
   examEnded: boolean
+  actualValidated: boolean | null
+  actualScore: number | null
+  outcome: 'exact' | 'correct' | 'wrong' | null
   poolerLogin: string
   poolerDisplayName: string
   poolerAvatarUrl: string
