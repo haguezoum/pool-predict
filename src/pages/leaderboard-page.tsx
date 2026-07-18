@@ -13,6 +13,7 @@ import { GlassSurface } from '@/components/ui/glass-surface'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { useMobileViewport } from '@/lib/use-mobile-viewport'
 
 function rankStyle(rank: number) {
   if (rank === 1) return 'bg-warning/14 text-[var(--rank-gold)]'
@@ -32,6 +33,8 @@ function initials(name: string) {
 export function LeaderboardPage() {
   const { user } = useAuth()
   const reducedMotion = useReducedMotion()
+  const mobileViewport = useMobileViewport()
+  const streamlinedMotion = Boolean(reducedMotion) || mobileViewport
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null)
   const poolQuery = useQuery({
     queryKey: ['pools', user?.campusId],
@@ -79,11 +82,11 @@ export function LeaderboardPage() {
   return (
     <motion.div
       className="flex flex-col gap-7"
-      initial={reducedMotion ? false : 'hidden'}
+      initial={streamlinedMotion ? false : 'hidden'}
       animate="visible"
       variants={{
         hidden: {},
-        visible: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } },
+        visible: { transition: { staggerChildren: streamlinedMotion ? 0 : 0.07 } },
       }}
     >
       <motion.section
@@ -191,6 +194,7 @@ export function LeaderboardPage() {
             key={entry.intraUserId}
             size="sm"
             className={cn(
+              'mobile-scroll-card mobile-scroll-card-compact',
               entry.login === user?.login &&
                 'border-2 border-primary/45'
             )}
@@ -205,7 +209,12 @@ export function LeaderboardPage() {
                 aria-label={`Open @${entry.login}'s prediction profile`}
               >
                 <Avatar size="sm">
-                  <AvatarImage src={entry.avatarUrl} alt={entry.login} />
+                  <AvatarImage
+                    src={entry.avatarUrl}
+                    alt={entry.login}
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">

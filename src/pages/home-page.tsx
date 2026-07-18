@@ -48,8 +48,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useMobileViewport } from '@/lib/use-mobile-viewport'
 
 const POOLER_BATCH_SIZE = 6
+const MOBILE_POOLER_BATCH_SIZE = 3
 const HIDE_CHARTS_STORAGE_KEY = 'pool-predict:hide-pooler-charts'
 const FridayLineChart = lazy(() =>
   import('@/components/friday-line-chart').then((module) => ({
@@ -153,9 +155,83 @@ type MatchCardProps = {
   bet: BetView | undefined
   sourceAvailable: boolean
   hideCharts: boolean
+  optimizeForMobile: boolean
 }
 
-function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCharts }: MatchCardProps) {
+function PoolerChart({
+  fridays,
+  login,
+  defer,
+}: {
+  fridays: Match['fridays']
+  login: string
+  defer: boolean
+}) {
+  const targetRef = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
+  const shouldRender = ready || !defer
+
+  useEffect(() => {
+    if (shouldRender) return
+    const target = targetRef.current
+    if (!target) return
+
+    let idleCallbackId: number | undefined
+    let timeoutId: number | undefined
+
+    const mountChart = () => {
+      startTransition(() => setReady(true))
+    }
+    const scheduleMount = () => {
+      const requestIdle = Reflect.get(window, 'requestIdleCallback') as
+        | ((callback: () => void, options: { timeout: number }) => number)
+        | undefined
+      if (requestIdle) {
+        idleCallbackId = requestIdle(mountChart, { timeout: 900 })
+      } else {
+        timeoutId = window.setTimeout(mountChart, 48)
+      }
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return
+        observer.disconnect()
+        scheduleMount()
+      },
+      { rootMargin: '420px 0px' }
+    )
+
+    observer.observe(target)
+    return () => {
+      observer.disconnect()
+      if (idleCallbackId !== undefined) window.cancelIdleCallback(idleCallbackId)
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+    }
+  }, [shouldRender])
+
+  return (
+    <div ref={targetRef} className="min-h-44">
+      {shouldRender ? (
+        <Suspense fallback={<Skeleton className="h-44 w-full" />}>
+          <FridayLineChart fridays={fridays} login={login} />
+        </Suspense>
+      ) : (
+        <Skeleton className="h-44 w-full" />
+      )}
+    </div>
+  )
+}
+
+function MatchCard({
+  match,
+  poolId,
+  campusId,
+  exam,
+  bet,
+  sourceAvailable,
+  hideCharts,
+  optimizeForMobile,
+}: MatchCardProps) {
   const reducedMotion = useReducedMotion()
   const queryClient = useQueryClient()
   const [decision, setDecision] = useState<'validate' | 'not_validate' | null>(
@@ -222,10 +298,10 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
   return (
     <>
       <motion.div
-        layout
-        whileHover={disabled || reducedMotion ? undefined : { y: -3 }}
+        layout={!optimizeForMobile && !reducedMotion}
+        whileHover={disabled || reducedMotion || optimizeForMobile ? undefined : { y: -3 }}
         transition={{ type: 'spring', duration: 0.24, bounce: 0 }}
-        className="relative z-0 hover:z-30 focus-within:z-30"
+        className="mobile-scroll-card mobile-scroll-card-tall relative z-0 hover:z-30 focus-within:z-30"
       >
         <Card
           size="sm"
@@ -366,9 +442,11 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
 
           {!hideCharts ? (
             <CardFooter className="relative z-10 mt-auto flex-col items-stretch overflow-hidden sm:overflow-visible">
-              <Suspense fallback={<Skeleton className="h-36 w-full" />}>
-                <FridayLineChart fridays={match.fridays} login={match.login} />
-              </Suspense>
+              <PoolerChart
+                fridays={match.fridays}
+                login={match.login}
+                defer={optimizeForMobile}
+              />
             </CardFooter>
           ) : null}
         </Card>
@@ -392,11 +470,14 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
 export function HomePage() {
   const { user } = useAuth()
   const reducedMotion = useReducedMotion()
+  const mobileViewport = useMobileViewport()
+  const streamlinedMotion = Boolean(reducedMotion) || mobileViewport
+  const poolerBatchSize = mobileViewport ? MOBILE_POOLER_BATCH_SIZE : POOLER_BATCH_SIZE
   const [activeTab, setActiveTab] = useState<'poolers' | 'predictions'>('poolers')
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState<'login' | 'level-desc' | 'level-asc'>('level-desc')
   const [memeOpen, setMemeOpen] = useState(false)
-  const [visiblePoolerCount, setVisiblePoolerCount] = useState(POOLER_BATCH_SIZE)
+  const [visiblePoolerCount, setVisiblePoolerCount] = useState(poolerBatchSize)
   const [hideCharts, setHideCharts] = useState(() => {
     if (typeof window === 'undefined') return false
     return localStorage.getItem(HIDE_CHARTS_STORAGE_KEY) === '1'
@@ -524,7 +605,7 @@ export function HomePage() {
         if (!entry?.isIntersecting) return
         startTransition(() => {
           setVisiblePoolerCount((count) =>
-            Math.min(count + POOLER_BATCH_SIZE, filteredMatches.length)
+            Math.min(count + poolerBatchSize, filteredMatches.length)
           )
         })
       },
@@ -533,12 +614,12 @@ export function HomePage() {
 
     observer.observe(target)
     return () => observer.disconnect()
-  }, [activeTab, filteredMatches.length, hasMorePoolers])
+  }, [activeTab, filteredMatches.length, hasMorePoolers, poolerBatchSize])
 
   if (poolQuery.isPending) {
     return (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }, (_, index) => (
+        {Array.from({ length: poolerBatchSize }, (_, index) => (
           <Skeleton key={index} className="h-80" />
         ))}
       </div>
@@ -560,12 +641,12 @@ export function HomePage() {
   return (
     <motion.div
       className="flex flex-col gap-7"
-      initial={reducedMotion ? false : 'hidden'}
+      initial={streamlinedMotion ? false : 'hidden'}
       animate="visible"
       variants={{
         hidden: {},
         visible: {
-          transition: { staggerChildren: reducedMotion ? 0 : 0.07 },
+          transition: { staggerChildren: streamlinedMotion ? 0 : 0.07 },
         },
       }}
     >
@@ -667,9 +748,9 @@ export function HomePage() {
           id="poolers-panel"
           role="tabpanel"
           className="flex flex-col gap-5"
-          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          initial={streamlinedMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reducedMotion ? 0 : 0.2 }}
+          transition={{ duration: streamlinedMotion ? 0 : 0.2 }}
         >
           {!pool.sourceAvailable ? (
             <p className="rounded-2xl bg-warning/13 px-4 py-3 text-sm text-warning-foreground shadow-[0_0_0_1px_color-mix(in_oklch,var(--warning),transparent_68%)_inset] dark:text-warning">
@@ -706,7 +787,7 @@ export function HomePage() {
                     }
 
                     setSortBy(nextSort as typeof sortBy)
-                    setVisiblePoolerCount(POOLER_BATCH_SIZE)
+                    setVisiblePoolerCount(poolerBatchSize)
                   }}
                   className="native-select px-3 text-sm sm:w-56"
                 >
@@ -723,7 +804,7 @@ export function HomePage() {
                     value={query}
                     onChange={(event) => {
                       setQuery(event.target.value)
-                      setVisiblePoolerCount(POOLER_BATCH_SIZE)
+                      setVisiblePoolerCount(poolerBatchSize)
                     }}
                     placeholder="Search login or name…"
                     className="pl-8"
@@ -734,7 +815,7 @@ export function HomePage() {
 
             {poolersQuery.isPending ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }, (_, index) => (
+                {Array.from({ length: poolerBatchSize }, (_, index) => (
                   <Skeleton key={index} className="h-80" />
                 ))}
               </div>
@@ -756,6 +837,7 @@ export function HomePage() {
                           bet={betsByPooler.get(match.intraUserId)}
                           sourceAvailable={pool.sourceAvailable}
                           hideCharts={hideCharts}
+                          optimizeForMobile={mobileViewport}
                         />
                       ))
                     : null}
@@ -779,9 +861,9 @@ export function HomePage() {
         <motion.div
           id="my-predictions-home-panel"
           role="tabpanel"
-          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          initial={streamlinedMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reducedMotion ? 0 : 0.2 }}
+          transition={{ duration: streamlinedMotion ? 0 : 0.2 }}
         >
           <PredictionHistory
             poolId={pool.id}

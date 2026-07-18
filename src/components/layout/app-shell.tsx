@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { GlassSurface } from '@/components/ui/glass-surface'
 import { cn } from '@/lib/utils'
+import { useMobileViewport } from '@/lib/use-mobile-viewport'
 
 const navItems = [
   { to: '/', label: 'Home', shortLabel: 'Home', icon: HomeIcon, end: true },
@@ -204,6 +205,7 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
 export function AppShell() {
   const location = useLocation()
   const reducedMotion = useReducedMotion()
+  const mobileViewport = useMobileViewport()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1'
@@ -360,14 +362,25 @@ export function AppShell() {
           <motion.main
             key={location.pathname}
             className="mx-auto w-full max-w-7xl flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:px-6 sm:pt-8 md:px-8 md:pb-10 lg:px-10"
-            initial={reducedMotion ? false : { opacity: 0, y: 10, filter: 'blur(3px)' }}
+            initial={
+              reducedMotion
+                ? false
+                : mobileViewport
+                  ? { opacity: 0, y: 4 }
+                  : { opacity: 0, y: 10, filter: 'blur(3px)' }
+            }
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             exit={
               reducedMotion
                 ? { opacity: 0 }
-                : { opacity: 0, y: -6, filter: 'blur(2px)' }
+                : mobileViewport
+                  ? { opacity: 0, y: -3 }
+                  : { opacity: 0, y: -6, filter: 'blur(2px)' }
             }
-            transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.2, 0, 0, 1] }}
+            transition={{
+              duration: reducedMotion ? 0 : mobileViewport ? 0.14 : 0.22,
+              ease: [0.2, 0, 0, 1],
+            }}
           >
             <Outlet />
           </motion.main>

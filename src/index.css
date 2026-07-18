@@ -422,6 +422,51 @@
   }
 }
 
+@media (max-width: 767px) {
+  .app-atmosphere::before,
+  .app-atmosphere::after {
+    display: none;
+  }
+
+  .liquid-glass,
+  .liquid-glass[data-variant="standard"],
+  .liquid-glass[data-variant="clear"],
+  .liquid-glass[data-variant="elevated"],
+  .liquid-glass[data-variant="interactive"] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .liquid-glass {
+    background: color-mix(in oklch, var(--glass-regular), var(--background) 42%);
+  }
+
+  .liquid-glass[data-variant="clear"] {
+    background: color-mix(in oklch, var(--glass-clear), var(--background) 46%);
+  }
+
+  .liquid-glass[data-variant="elevated"] {
+    background: color-mix(in oklch, var(--glass-elevated), var(--background) 28%);
+  }
+
+  .liquid-glass[data-variant="interactive"] {
+    background: color-mix(in oklch, var(--glass-interactive), var(--background) 36%);
+  }
+
+  .mobile-scroll-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 18rem;
+  }
+
+  .mobile-scroll-card-compact {
+    contain-intrinsic-size: auto 6.5rem;
+  }
+
+  .mobile-scroll-card-tall {
+    contain-intrinsic-size: auto 34rem;
+  }
+}
+
 @media (prefers-contrast: more) {
   :root {
     --border: color-mix(in oklch, var(--foreground), transparent 62%);

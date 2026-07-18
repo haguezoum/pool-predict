@@ -113,12 +113,17 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
   }
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="mobile-scroll-card">
       <CardContent className="flex flex-col gap-4 pt-(--card-spacing)">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <Avatar size="sm">
-              <AvatarImage src={prediction.poolerAvatarUrl} alt={prediction.poolerLogin} />
+              <AvatarImage
+                src={prediction.poolerAvatarUrl}
+                alt={prediction.poolerLogin}
+                loading="lazy"
+                decoding="async"
+              />
               <AvatarFallback>{initials(prediction.poolerDisplayName)}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">

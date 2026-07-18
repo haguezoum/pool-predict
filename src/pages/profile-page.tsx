@@ -15,11 +15,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { GlassSurface } from '@/components/ui/glass-surface'
 import { Separator } from '@/components/ui/separator'
+import { useMobileViewport } from '@/lib/use-mobile-viewport'
 
 export function ProfilePage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const reducedMotion = useReducedMotion()
+  const mobileViewport = useMobileViewport()
+  const streamlinedMotion = Boolean(reducedMotion) || mobileViewport
   if (!user) return null
 
   const initials = user.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
@@ -37,11 +40,11 @@ export function ProfilePage() {
   return (
     <motion.div
       className="flex flex-col gap-7"
-      initial={reducedMotion ? false : 'hidden'}
+      initial={streamlinedMotion ? false : 'hidden'}
       animate="visible"
       variants={{
         hidden: {},
-        visible: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } },
+        visible: { transition: { staggerChildren: streamlinedMotion ? 0 : 0.07 } },
       }}
     >
       <motion.section
@@ -140,9 +143,9 @@ export function ProfilePage() {
           >
             <motion.div
               className="h-full rounded-full bg-primary"
-              initial={reducedMotion ? false : { width: 0 }}
+              initial={streamlinedMotion ? false : { width: 0 }}
               animate={{ width: `${user.accuracy}%` }}
-              transition={{ duration: reducedMotion ? 0 : 0.3, ease: [0.2, 0, 0, 1] }}
+              transition={{ duration: streamlinedMotion ? 0 : 0.3, ease: [0.2, 0, 0, 1] }}
             />
           </div>
           <p className="text-xs text-muted-foreground">
