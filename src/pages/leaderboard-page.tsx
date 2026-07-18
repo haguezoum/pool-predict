@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { motion, useReducedMotion } from 'motion/react'
 import { TrophyIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
@@ -8,14 +9,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassSurface } from '@/components/ui/glass-surface'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 function rankStyle(rank: number) {
-  if (rank === 1) return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-  if (rank === 2) return 'bg-zinc-400/15 text-zinc-600 dark:text-zinc-300'
-  if (rank === 3) return 'bg-orange-600/15 text-orange-700 dark:text-orange-400'
+  if (rank === 1) return 'bg-warning/14 text-[var(--rank-gold)]'
+  if (rank === 2) return 'bg-foreground/8 text-[var(--rank-silver)]'
+  if (rank === 3) return 'bg-[color-mix(in_oklch,var(--rank-bronze),transparent_86%)] text-[var(--rank-bronze)]'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -29,6 +31,7 @@ function initials(name: string) {
 
 export function LeaderboardPage() {
   const { user } = useAuth()
+  const reducedMotion = useReducedMotion()
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null)
   const poolQuery = useQuery({
     queryKey: ['pools', user?.campusId],
@@ -74,12 +77,30 @@ export function LeaderboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <motion.div
+      className="flex flex-col gap-7"
+      initial={reducedMotion ? false : 'hidden'}
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } },
+      }}
+    >
+      <motion.section
+        variants={{
+          hidden: { opacity: 0, y: 10, filter: 'blur(3px)' },
+          visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
+        }}
+        transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
+      >
+        <GlassSurface
+          variant="standard"
+          className="flex flex-col gap-4 rounded-[2rem] p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6"
+        >
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
             <TrophyIcon className="size-5 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
+            <h1 className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Leaderboard</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             {selectedPool?.status === 'closed' ? 'Archived pool' : 'Current pool'} · rank ties are sorted by login; unranked players follow by account age.
@@ -89,7 +110,7 @@ export function LeaderboardPage() {
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             Pool
             <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="native-select min-w-48 px-3 text-sm"
               value={activePoolId}
               onChange={(event) => setSelectedPoolId(event.target.value)}
             >
@@ -101,10 +122,18 @@ export function LeaderboardPage() {
             </select>
           </label>
         ) : null}
-      </section>
+        </GlassSurface>
+      </motion.section>
 
       {top3.length > 0 ? (
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
+        <motion.section
+          variants={{
+            hidden: { opacity: 0, y: 12 },
+            visible: { opacity: 1, y: 0 },
+          }}
+          transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end"
+        >
           {top3.map((entry, index) => {
             const order = index === 0 ? 'sm:order-2' : index === 1 ? 'sm:order-1' : 'sm:order-3'
             const height = index === 0 ? 'sm:pb-8 sm:pt-6' : index === 1 ? 'sm:pb-5 sm:pt-4' : 'sm:pb-3 sm:pt-3'
@@ -112,7 +141,13 @@ export function LeaderboardPage() {
               <Card
                 key={entry.intraUserId}
                 size="sm"
-                className={cn(order, height, entry.login === user?.login && 'ring-2 ring-primary/40')}
+                className={cn(
+                  order,
+                  height,
+                  'hover:bg-card/96',
+                  entry.login === user?.login &&
+                    'border-2 border-primary/45'
+                )}
               >
                 <CardHeader className="items-center text-center">
                   <span className={cn('flex size-8 items-center justify-center rounded-full text-sm font-bold tabular-nums', rankStyle(entry.rank))}>
@@ -123,7 +158,7 @@ export function LeaderboardPage() {
                     aria-label={`Open @${entry.login}'s prediction profile`}
                     className="group flex flex-col items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Avatar className="mx-auto mt-2 size-12 transition-transform group-hover:scale-105">
+                    <Avatar className="mx-auto mt-2 size-12 transition-[scale] duration-180 group-hover:scale-105">
                       <AvatarImage src={entry.avatarUrl} alt={entry.login} />
                       <AvatarFallback>{initials(entry.displayName)}</AvatarFallback>
                     </Avatar>
@@ -133,19 +168,33 @@ export function LeaderboardPage() {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-1 pt-0">
                   <p className="text-xl font-semibold tabular-nums">{entry.totalScore}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground tabular-nums">
                     {entry.exactHits} exact · {entry.accuracy}% correct
                   </p>
                 </CardContent>
               </Card>
             )
           })}
-        </section>
+        </motion.section>
       ) : null}
 
-      <section className="flex flex-col gap-3 md:hidden">
+      <motion.section
+        variants={{
+          hidden: { opacity: 0, y: 10 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+        className="flex flex-col gap-3 md:hidden"
+      >
         {leaderboard.map((entry) => (
-          <Card key={entry.intraUserId} size="sm" className={cn(entry.login === user?.login && 'ring-2 ring-primary/40')}>
+          <Card
+            key={entry.intraUserId}
+            size="sm"
+            className={cn(
+              entry.login === user?.login &&
+                'border-2 border-primary/45'
+            )}
+          >
             <CardContent className="flex items-center gap-3 pt-(--card-spacing)">
               <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
                 {rankLabel(entry.rank)}
@@ -164,18 +213,25 @@ export function LeaderboardPage() {
                     {entry.displayName}
                     {entry.login === user?.login ? <Badge variant="secondary" className="ml-1.5">You</Badge> : null}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">@{entry.login} · {entry.exactHits} exact</p>
+                  <p className="truncate text-xs text-muted-foreground tabular-nums">@{entry.login} · {entry.exactHits} exact</p>
                 </div>
               </Link>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold tabular-nums">{entry.totalScore}</p>
-                <p className="text-[0.65rem] text-muted-foreground">{entry.missedExams} missed</p>
+                <p className="text-[0.65rem] text-muted-foreground tabular-nums">{entry.missedExams} missed</p>
               </div>
             </CardContent>
           </Card>
         ))}
-      </section>
+      </motion.section>
 
+      <motion.div
+        variants={{
+          hidden: { opacity: 0, y: 10 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+      >
       <Card className="hidden overflow-hidden py-0 md:block">
         <Table>
           <TableHeader>
@@ -190,7 +246,7 @@ export function LeaderboardPage() {
           </TableHeader>
           <TableBody>
             {leaderboard.map((entry) => (
-              <TableRow key={entry.intraUserId} className={cn(entry.login === user?.login && 'bg-primary/5')}>
+              <TableRow key={entry.intraUserId} className={cn(entry.login === user?.login && 'bg-primary/7')}>
                 <TableCell>
                   <span className={cn('inline-flex size-7 items-center justify-center rounded-full text-xs font-bold tabular-nums', rankStyle(entry.rank))}>
                     {rankLabel(entry.rank)}
@@ -224,6 +280,19 @@ export function LeaderboardPage() {
           </TableBody>
         </Table>
       </Card>
-    </div>
+      </motion.div>
+
+      {leaderboard.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <TrophyIcon className="size-6 text-muted-foreground" />
+            <p className="font-semibold">No ranked players yet</p>
+            <p className="text-sm text-muted-foreground">
+              Scores will appear after the first exam is settled.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+    </motion.div>
   )
 }

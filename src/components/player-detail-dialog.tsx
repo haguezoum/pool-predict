@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AnimatePresence, motion } from 'motion/react'
-import { CheckIcon, XIcon } from 'lucide-react'
+import { CheckIcon, ExternalLinkIcon, XIcon } from 'lucide-react'
 import type { Match } from '@/types'
 import {
   api,
@@ -11,7 +9,13 @@ import {
 } from '@/lib/api'
 import { FridayLineChart } from '@/components/friday-line-chart'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 function initials(name: string) {
@@ -46,191 +50,135 @@ export function PlayerDetailDialog({
     staleTime: POOLER_PROJECTS_CACHE_MS,
   })
 
-  useEffect(() => {
-    if (!open) return
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (avatarPreviewOpen) {
-        setAvatarPreviewOpen(false)
-        return
-      }
-      onOpenChange(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open, onOpenChange, avatarPreviewOpen])
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) setAvatarPreviewOpen(false)
+    onOpenChange(nextOpen)
+  }
 
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+  return (
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          className="flex max-h-[calc(100svh-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[90svh] sm:max-w-2xl"
+          aria-describedby={`player-dialog-description-${match.id}`}
         >
-          <button
-            type="button"
-            aria-label="Close player details"
-            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
-            onClick={() => onOpenChange(false)}
-          />
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`player-dialog-title-${match.id}`}
-            className="relative z-10 flex max-h-[90svh] w-full max-w-xl flex-col overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/10"
-            initial={{ opacity: 0, scale: 0.92, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
-          >
-            <header className="relative border-b px-4 py-4 sm:px-6">
-              <div className="flex w-fit items-center gap-3 pr-10">
-                <button
-                  type="button"
-                  onClick={() => setAvatarPreviewOpen(true)}
-                  aria-label={`View @${match.login}'s photo larger`}
-                  className="shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Avatar className="size-12 cursor-zoom-in transition-transform hover:scale-105 sm:size-14">
-                    <AvatarImage src={match.avatarUrl} alt={match.login} />
-                    <AvatarFallback>{initials(match.fullName)}</AvatarFallback>
-                  </Avatar>
-                </button>
-                <a
-                  href={`https://profile.intra.42.fr/users/${encodeURIComponent(match.login)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open @${match.login}'s 42 profile in a new tab`}
-                  className="group min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span
-                    id={`player-dialog-title-${match.id}`}
-                    className="block truncate text-lg font-semibold tracking-tight group-hover:underline"
-                  >
-                    @{match.login}
-                  </span>
-                  <span className="block truncate text-sm text-muted-foreground">{match.fullName}</span>
-                  <span className="mt-0.5 block text-base font-semibold tabular-nums text-primary sm:text-lg">
-                    Lvl {match.level?.toFixed(2) ?? '—'}
-                  </span>
-                </a>
-              </div>
-              <Button
+          <DialogHeader className="border-b border-[var(--separator)] p-5 pr-16 sm:p-6 sm:pr-16">
+            <div className="flex items-center gap-3">
+              <button
                 type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="absolute top-3 right-3"
-                aria-label="Close"
-                onClick={() => onOpenChange(false)}
+                onClick={() => setAvatarPreviewOpen(true)}
+                aria-label={`View @${match.login}'s photo larger`}
+                className="flex size-14 shrink-0 items-center justify-center rounded-full outline-none transition-[scale] duration-160 active:scale-[0.96] sm:size-16"
               >
-                <XIcon />
-              </Button>
-            </header>
-
-            <div className="overflow-y-auto px-4 py-5 sm:px-6">
-              <section className="flex flex-col gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold tracking-tight">Pool progress</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Exam and project scores are loaded live from 42 and never copied into the app database.
-                  </p>
-                </div>
-                <div
-                  className={cn(
-                    'overflow-visible rounded-xl border p-2 transition-colors sm:p-3',
-                    projectsQuery.isFetching
-                      ? 'animate-pulse border-primary/60'
-                      : projectsQuery.isError
-                        ? 'border-destructive/50'
-                        : 'border-border'
-                  )}
-                  aria-busy={projectsQuery.isFetching}
-                >
-                  <FridayLineChart
-                    fridays={match.fridays}
-                    login={match.login}
-                    projectResults={projectsQuery.data}
-                    showSeriesControls
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {match.results.map((result) => (
-                    <div key={result.code} className="rounded-lg border border-border p-3">
-                      <p className="text-xs text-muted-foreground">Exam {result.code}</p>
-                      <p
-                        className={cn(
-                          'mt-1 flex items-center gap-1 text-sm font-medium',
-                          result.validated === true && 'text-emerald-600 dark:text-emerald-400',
-                          result.validated === false && 'text-red-600 dark:text-red-400'
-                        )}
-                      >
-                        {result.validated === null ? (
-                          'Pending'
-                        ) : result.validated ? (
-                          <><CheckIcon className="size-3.5" /> {result.score ?? 'Validated'}</>
-                        ) : (
-                          <><XIcon className="size-3.5" /> Not validated</>
-                        )}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </motion.div>
-
-          <AnimatePresence>
-            {avatarPreviewOpen ? (
-              <motion.div
-                className="fixed inset-0 z-[60] flex items-center justify-center p-6"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <button
-                  type="button"
-                  aria-label="Close photo preview"
-                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
-                  onClick={() => setAvatarPreviewOpen(false)}
-                />
-                <motion.div
-                  className="relative z-10"
-                  initial={{ opacity: 0, scale: 0.72 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.85 }}
-                  transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-                >
-                  <Avatar className="size-48 shadow-2xl ring-4 ring-white/20 sm:size-64 md:size-80">
-                    <AvatarImage src={match.avatarUrl} alt={match.login} className="object-cover" />
-                    <AvatarFallback className="text-4xl sm:text-5xl">
-                      {initials(match.fullName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon-sm"
-                    className="absolute -top-2 -right-2 rounded-full shadow-md"
-                    aria-label="Close photo preview"
-                    onClick={() => setAvatarPreviewOpen(false)}
+                <Avatar className="size-14 cursor-zoom-in transition-[scale] duration-180 hover:scale-105 sm:size-16">
+                  <AvatarImage src={match.avatarUrl} alt={match.login} />
+                  <AvatarFallback>{initials(match.fullName)}</AvatarFallback>
+                </Avatar>
+              </button>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg sm:text-xl">
+                  <a
+                    href={`https://profile.intra.42.fr/users/${encodeURIComponent(match.login)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <XIcon />
-                  </Button>
-                </motion.div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
+                    <span className="truncate">@{match.login}</span>
+                    <ExternalLinkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  </a>
+                </DialogTitle>
+                <DialogDescription
+                  id={`player-dialog-description-${match.id}`}
+                  className="mt-0.5 truncate"
+                >
+                  {match.fullName}
+                </DialogDescription>
+                <p className="mt-1 text-base font-semibold text-primary tabular-nums">
+                  Level {match.level?.toFixed(2) ?? '—'}
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="overflow-y-auto p-4 sm:p-6">
+            <section className="flex flex-col gap-4">
+              <div>
+                <h3 className="text-sm font-semibold tracking-[-0.012em]">Pool progress</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Exam and project scores load live from 42 and are never copied into the app
+                  database.
+                </p>
+              </div>
+
+              <div
+                className={cn(
+                  'overflow-visible rounded-[1.25rem] bg-muted/24 p-2 shadow-[0_0_0_1px_var(--separator)_inset] transition-[box-shadow,background-color,opacity] duration-180 sm:p-3',
+                  projectsQuery.isFetching && 'opacity-75',
+                  projectsQuery.isError &&
+                    'bg-destructive/6 shadow-[0_0_0_1px_color-mix(in_oklch,var(--destructive),transparent_68%)_inset]'
+                )}
+                aria-busy={projectsQuery.isFetching}
+              >
+                <FridayLineChart
+                  fridays={match.fridays}
+                  login={match.login}
+                  projectResults={projectsQuery.data}
+                  showSeriesControls
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {match.results.map((result) => (
+                  <div
+                    key={result.code}
+                    className="rounded-xl bg-muted/28 p-3 shadow-[0_0_0_1px_var(--separator)_inset]"
+                  >
+                    <p className="text-xs text-muted-foreground">Exam {result.code}</p>
+                    <p
+                      className={cn(
+                        'mt-1.5 flex items-center gap-1 text-sm font-semibold tabular-nums',
+                        result.validated === true && 'text-success',
+                        result.validated === false && 'text-destructive',
+                        result.validated === null && 'text-muted-foreground'
+                      )}
+                    >
+                      {result.validated === null ? (
+                        'Pending'
+                      ) : result.validated ? (
+                        <>
+                          <CheckIcon className="size-3.5" />
+                          {result.score ?? 'Validated'}
+                        </>
+                      ) : (
+                        <>
+                          <XIcon className="size-3.5" />
+                          Not validated
+                        </>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={avatarPreviewOpen} onOpenChange={setAvatarPreviewOpen}>
+        <DialogContent
+          showCloseButton
+          className="w-auto max-w-[calc(100%-2rem)] rounded-[2rem] bg-black/38 p-3 text-white sm:max-w-none"
+          aria-describedby={undefined}
+        >
+          <DialogTitle className="sr-only">Photo of @{match.login}</DialogTitle>
+          <Avatar className="size-56 shadow-[0_0_0_1px_var(--glass-edge)] sm:size-72 md:size-80">
+            <AvatarImage src={match.avatarUrl} alt={match.login} className="object-cover" />
+            <AvatarFallback className="text-4xl sm:text-5xl">
+              {initials(match.fullName)}
+            </AvatarFallback>
+          </Avatar>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

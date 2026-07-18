@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import Stack from '@mui/material/Stack'
+import useMediaQuery from '@mui/material/useMediaQuery'
 import { LineChart } from '@mui/x-charts/LineChart'
 import type { ProjectResultView } from '@shared/contracts'
 import { useTheme } from '@/context/theme-context'
@@ -11,14 +12,13 @@ function useChartColors() {
   const isDark = resolvedTheme === 'dark'
 
   return {
-    axis: isDark ? 'oklch(0.97 0.01 240)' : 'oklch(0.35 0.04 258)',
-    tickLabel: isDark ? 'oklch(0.85 0.02 245)' : 'oklch(0.45 0.03 250)',
-    grid: isDark ? 'oklch(0.64 0.15 241 / 20%)' : 'oklch(0.50 0.03 250 / 18%)',
-    label: isDark ? 'oklch(0.97 0.01 240)' : 'oklch(0.25 0.04 258)',
-    series: isDark ? '#22c55e' : '#16a34a',
-    markStroke: isDark ? '#16a34a' : '#15803d',
-    projectSeries: isDark ? '#c084fc' : '#9333ea',
-    examAxis: isDark ? '#f87171' : '#dc2626',
+    axis: isDark ? 'oklch(0.94 0.01 245 / 56%)' : 'oklch(0.28 0.03 255 / 46%)',
+    tickLabel: isDark ? 'oklch(0.78 0.02 245)' : 'oklch(0.45 0.025 250)',
+    grid: isDark ? 'oklch(0.94 0.01 245 / 10%)' : 'oklch(0.28 0.03 255 / 10%)',
+    label: isDark ? 'oklch(0.94 0.01 245)' : 'oklch(0.25 0.03 258)',
+    series: 'var(--chart-exam-series)',
+    projectSeries: 'var(--chart-project-series)',
+    examAxis: 'var(--chart-exam-label)',
   }
 }
 
@@ -55,6 +55,7 @@ export function FridayLineChart({
   showSeriesControls = false,
 }: FridayLineChartProps) {
   const colors = useChartColors()
+  const compact = useMediaQuery('(max-width:639px)')
   const controlsId = useId()
   const [showExams, setShowExams] = useState(true)
   const [showProjects, setShowProjects] = useState(true)
@@ -111,36 +112,38 @@ export function FridayLineChart({
   ]
 
   return (
-    <div className="relative z-10 flex w-full flex-col gap-2">
+    <div className="relative z-10 flex w-full min-w-0 flex-col gap-2 overflow-hidden sm:overflow-visible">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           {showSeriesControls ? 'Exam & project progression · 0–100' : 'Last 4 exams'}
         </p>
         {showSeriesControls ? (
-          <fieldset className="flex items-center gap-3" aria-label="Chart lines">
+          <fieldset className="flex items-center gap-1" aria-label="Chart lines">
             <label
               htmlFor={`${controlsId}-exams`}
-              className="flex cursor-pointer items-center gap-1.5 text-xs font-medium"
+              className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl px-2 text-xs font-medium transition-[background-color] duration-160 hover:bg-muted/52"
             >
               <input
                 id={`${controlsId}-exams`}
                 type="checkbox"
                 checked={showExams}
                 onChange={(event) => setShowExams(event.target.checked)}
-                className="size-3.5 accent-emerald-600"
+                className="native-check"
+                style={{ accentColor: 'var(--chart-exam-series)' }}
               />
               Exams
             </label>
             <label
               htmlFor={`${controlsId}-projects`}
-              className="flex cursor-pointer items-center gap-1.5 text-xs font-medium"
+              className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl px-2 text-xs font-medium transition-[background-color] duration-160 hover:bg-muted/52"
             >
               <input
                 id={`${controlsId}-projects`}
                 type="checkbox"
                 checked={showProjects}
                 onChange={(event) => setShowProjects(event.target.checked)}
-                className="size-3.5 accent-purple-600"
+                className="native-check"
+                style={{ accentColor: 'var(--chart-project-series)' }}
               />
               Projects
             </label>
@@ -151,8 +154,9 @@ export function FridayLineChart({
         sx={{
           width: '100%',
           // Card charts need bottom room for x labels; detail chart needs room for 45° project labels
-          height: showSeriesControls ? 380 : 176,
+          height: showSeriesControls ? (compact ? 330 : 380) : 176,
           overflow: 'visible',
+          fontFamily: 'var(--font-sans)',
           '& .MuiChartsSurface-root, & svg, & .MuiChartsAxis-root, & .MuiChartsAxis-tickLabel': {
             overflow: 'visible',
           },
@@ -174,13 +178,22 @@ export function FridayLineChart({
                     valueFormatter: (value: number) => {
                       if (!showProjects) return ''
                       const project = projectTimeline[value]
+                      if (
+                        compact &&
+                        projectTimeline.length > 5 &&
+                        value !== 0 &&
+                        value !== projectTimeline.length - 1 &&
+                        value % 2 !== 0
+                      ) {
+                        return ''
+                      }
                       return project ? projectAxisLabel(project.name) : ''
                     },
                     tickLabelInterval: () => true,
                     tickLabelMinGap: 0,
                     tickLabelStyle: {
                       fill: colors.projectSeries,
-                      fontSize: 9,
+                      fontSize: compact ? 8 : 9,
                       fontWeight: 600,
                       angle: 45,
                       textAnchor: 'start' as const,
@@ -225,7 +238,7 @@ export function FridayLineChart({
           ]}
           yAxis={[
             {
-              width: 32,
+              width: compact ? 28 : 34,
               min: 0,
               max: 100,
               tickNumber: 5,
@@ -239,7 +252,7 @@ export function FridayLineChart({
           margin={{
             // Edge labels use (margin + axis) as width budget; too small → empty tspans
             top: showSeriesControls ? 36 : 8,
-            right: showSeriesControls ? 56 : 20,
+            right: showSeriesControls ? (compact ? 30 : 56) : 20,
             bottom: showSeriesControls ? 8 : 8,
             left: showSeriesControls ? 8 : 8,
           }}
@@ -305,6 +318,9 @@ export function FridayLineChart({
             },
             '& .MuiMarkElement-root': {
               strokeWidth: 1.5,
+            },
+            '& .MuiLineElement-root': {
+              strokeWidth: 2.4,
             },
             [`& .MuiLineElement-root[data-series="${projectSeriesId}"]`]: {
               strokeDasharray: '6 4',

@@ -1,3 +1,5 @@
+import { motion, useReducedMotion } from 'motion/react'
+import { InfoIcon, ShieldCheckIcon } from 'lucide-react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { FortyTwoLogo } from '@/components/icons/forty-two-logo'
@@ -10,12 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { GlassSurface } from '@/components/ui/glass-surface'
 
 const LOGIN_BACKGROUND_URL = '/login-background.jpg'
 
 export function LoginPage() {
   const { isAuthenticated, isLoading, loginWith42 } = useAuth()
   const [searchParams] = useSearchParams()
+  const reducedMotion = useReducedMotion()
 
   const error = searchParams.get('error')
   const errorMessage = error
@@ -34,8 +38,15 @@ export function LoginPage() {
     return <Navigate to="/" replace />
   }
 
+  const enter = reducedMotion
+    ? { initial: false as const, animate: { opacity: 1 } }
+    : {
+        initial: { opacity: 0, y: 14, filter: 'blur(4px)' },
+        animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+      }
+
   return (
-    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
+    <div className="app-atmosphere relative min-h-svh overflow-hidden bg-slate-950 text-white">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -43,98 +54,130 @@ export function LoginPage() {
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/35 via-slate-950/50 to-slate-950/80"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,oklch(0.11_0.04_257/88%)_0%,oklch(0.15_0.05_255/68%)_44%,oklch(0.12_0.035_258/52%)_100%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_35%,oklch(0.61_0.17_244/20%),transparent_28rem)]"
       />
 
-      <div className="absolute top-4 left-4 z-20 sm:top-6 sm:left-6">
-        <ThemeToggle className="bg-black/25 text-white backdrop-blur-sm hover:bg-black/40 hover:text-white" />
+      <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-20 sm:top-5 sm:left-5">
+        <GlassSurface variant="clear" className="rounded-2xl p-1">
+          <ThemeToggle className="text-white hover:bg-white/12 hover:text-white" />
+        </GlassSurface>
       </div>
 
-      <div className="absolute top-4 right-4 z-20 max-w-[min(100%-2rem,20rem)] sm:top-6 sm:right-6 sm:max-w-xs">
-        <div className="rounded-md border border-white/15 bg-black px-3 py-2.5 font-mono text-[11px] leading-relaxed text-white shadow-lg sm:text-xs">
-          <p className="mb-1.5 font-semibold tracking-wide text-white/90">
-            ⚠️ notice for poolers
-          </p>
-          <p className="line-clamp-8 text-md">
-            If anything here feels offensive, or you want your data or profile removed from this
-            platform — including info that comes from the 42 Network API — just reach out with your
-            login.
-          </p>
-          <p className="mt-2">
-            Discord:{' '}
-            <a
-              href="https://discordapp.com/users/ops_up"
-              target="_blank"
-              rel="noreferrer"
-              className="underline decoration-white/40 underline-offset-2 hover:decoration-white"
-            >
-              @ops_up
-            </a>
-            <br />
-            X / Twitter:{' '}
-            <a
-              href="https://x.com/hassan_aguezoum"
-              target="_blank"
-              rel="noreferrer"
-              className="underline decoration-white/40 underline-offset-2 hover:decoration-white"
-            >
-              @hassan_aguezoum
-            </a>
-          </p>
-          <p className="mt-2 text-white/70">
-            Your privacy matters. This app only uses 42 data to run predictions — ask anytime and
-            we&apos;ll take care of it 🤷.
-          </p>
-        </div>
-      </div>
-
-      <div className="relative z-10 mt-28 flex w-full max-w-sm flex-col items-center gap-8 sm:mt-16 md:mt-0">
-        <div className="flex flex-col items-center gap-10 text-center">
-          <div className="flex items-center -mt-20 justify-center gap-3 sm:gap-4">
+      <main className="relative z-10 mx-auto grid min-h-svh w-full max-w-6xl items-center gap-8 px-5 py-20 lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.72fr)] lg:px-10">
+        <motion.section
+          {...enter}
+          transition={{ duration: reducedMotion ? 0 : 0.28, ease: [0.2, 0, 0, 1] }}
+          className="flex flex-col items-center gap-7 text-center lg:items-start lg:text-left"
+        >
+          <div className="flex items-end gap-3">
             <img
               src="/wa-validi.webp"
               alt="1337 Pool"
-              className="h-32 w-auto object-contain object-top -mt-10 sm:h-40"
+              className="h-28 w-auto object-contain sm:h-36"
             />
-            <span className="font-display text-3xl tracking-wide text-white sm:text-4xl">
-              (1337X BET)
-            </span>
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-3xl">
-            1337 Pool Predict
-          </h1>
-        </div>
-
-        <Card className="w-full bg-card/95 shadow-2xl shadow-black/30 backdrop-blur-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-base">Welcome back</CardTitle>
-            <CardDescription>
-              Sign in with your Intra 42 account to continue
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {errorMessage ? (
-              <p className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {errorMessage}
+            <div className="pb-3">
+              <p className="text-[0.68rem] font-semibold tracking-[0.18em] text-white/62 uppercase">
+                42 Network · Tetouan
               </p>
-            ) : null}
-            <Button
-              type="button"
-              size="lg"
-              className="h-11 w-full gap-2.5 text-sm font-medium"
-              onClick={loginWith42}
-              disabled={isLoading}
-            >
-              <FortyTwoLogo data-icon="inline-start" className="size-5" />
-              {isLoading ? 'Checking session…' : 'Sign in and continue'}
-            </Button>
-          </CardContent>
-        </Card>
+              <p className="mt-1 text-xl font-semibold tracking-[-0.025em] sm:text-2xl">
+                1337X Bet
+              </p>
+            </div>
+          </div>
 
-        <p className="text-center text-xs text-white/70 drop-shadow-sm">
-          Current poolers cannot access the platform.
-        </p>
-      </div>
+          <div className="max-w-xl">
+            <h1 className="text-4xl font-semibold tracking-[-0.045em] text-balance sm:text-5xl">
+              Predict the pool.
+              <span className="block text-white/58">Follow every result.</span>
+            </h1>
+            <p className="mt-4 max-w-lg text-sm leading-6 text-white/68 sm:text-base">
+              A private leaderboard for active 42 core students, built around live pool
+              progress and exam outcomes.
+            </p>
+          </div>
+
+          <GlassSurface
+            variant="clear"
+            className="max-w-xl rounded-[1.5rem] p-4 text-left text-white"
+          >
+            <div className="flex gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white/82">
+                <InfoIcon className="size-[1.05rem]" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">A note for poolers</p>
+                <p className="mt-1 text-xs leading-5 text-white/66">
+                  If anything feels offensive or you want your 42 data removed, send your
+                  login to{' '}
+                  <a
+                    href="https://discordapp.com/users/ops_up"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-white underline decoration-white/35 underline-offset-2"
+                  >
+                    @ops_up
+                  </a>
+                  . We’ll take care of it.
+                </p>
+              </div>
+            </div>
+          </GlassSurface>
+        </motion.section>
+
+        <motion.section
+          {...enter}
+          transition={{
+            duration: reducedMotion ? 0 : 0.3,
+            delay: reducedMotion ? 0 : 0.08,
+            ease: [0.2, 0, 0, 1],
+          }}
+          className="mx-auto w-full max-w-md"
+        >
+          <GlassSurface variant="elevated" className="rounded-[2rem] p-2 text-foreground">
+            <Card className="rounded-[1.5rem] bg-card/86 shadow-none">
+              <CardHeader className="gap-2 text-center">
+                <span className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                  <ShieldCheckIcon className="size-5" />
+                </span>
+                <CardTitle className="text-xl">Welcome back</CardTitle>
+                <CardDescription>
+                  Continue with the Intra account connected to your 42 profile.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {errorMessage ? (
+                  <div
+                    role="alert"
+                    className="rounded-xl bg-destructive/10 px-3 py-2.5 text-sm text-destructive shadow-[0_0_0_1px_color-mix(in_oklch,var(--destructive),transparent_76%)_inset]"
+                  >
+                    {errorMessage}
+                  </div>
+                ) : null}
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full"
+                  onClick={loginWith42}
+                  disabled={isLoading}
+                >
+                  <FortyTwoLogo data-icon="inline-start" />
+                  {isLoading ? 'Checking session…' : 'Sign in with 42'}
+                </Button>
+                <p className="text-center text-xs leading-5 text-muted-foreground">
+                  Current poolers and staff accounts cannot access the platform.
+                </p>
+              </CardContent>
+            </Card>
+          </GlassSurface>
+          <p className="mt-4 text-center text-[0.68rem] text-white/54">
+            Predictions remain hidden from other players until each exam ends.
+          </p>
+        </motion.section>
+      </main>
     </div>
   )
 }

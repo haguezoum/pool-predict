@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { motion, useReducedMotion } from 'motion/react'
 import { ArrowLeftIcon } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { PredictionHistory } from '@/components/prediction-history'
@@ -10,6 +11,7 @@ import { useAuth } from '@/context/auth-context'
 
 export function PlayerProfilePage() {
   const { user } = useAuth()
+  const reducedMotion = useReducedMotion()
   const { intraUserId: intraUserIdParam } = useParams()
   const [searchParams] = useSearchParams()
   const requestedPoolId = searchParams.get('poolId')
@@ -47,8 +49,13 @@ export function PlayerProfilePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Button asChild variant="ghost" className="w-fit px-0 hover:bg-transparent">
+    <motion.div
+      className="flex flex-col gap-6"
+      initial={reducedMotion ? false : { opacity: 0, y: 10, filter: 'blur(3px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.2, 0, 0, 1] }}
+    >
+      <Button asChild variant="ghost" className="w-fit">
         <Link to="/leaderboard"><ArrowLeftIcon data-icon="inline-start" /> Back to leaderboard</Link>
       </Button>
       {poolId && user ? (
@@ -58,6 +65,6 @@ export function PlayerProfilePage() {
           intraUserId={intraUserId}
         />
       ) : null}
-    </div>
+    </motion.div>
   )
 }

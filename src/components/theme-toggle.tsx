@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react'
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 import { useTheme, type Theme } from '@/context/theme-context'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ const OPTIONS: { value: Theme; label: string; icon: typeof SunIcon }[] = [
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, resolvedTheme, setTheme } = useTheme()
+  const ResolvedIcon = resolvedTheme === 'dark' ? MoonIcon : SunIcon
 
   return (
     <DropdownMenu>
@@ -29,11 +31,18 @@ export function ThemeToggle({ className }: { className?: string }) {
           className={cn('relative', className)}
           aria-label="Toggle theme"
         >
-          {resolvedTheme === 'dark' ? (
-            <MoonIcon className="size-4" />
-          ) : (
-            <SunIcon className="size-4" />
-          )}
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.span
+              key={resolvedTheme}
+              className="flex items-center justify-center"
+              initial={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            >
+              <ResolvedIcon />
+            </motion.span>
+          </AnimatePresence>
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
@@ -44,7 +53,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         >
           {OPTIONS.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
-              <Icon className="size-4 text-muted-foreground" />
+              <Icon className="text-muted-foreground" />
               {label}
             </DropdownMenuRadioItem>
           ))}

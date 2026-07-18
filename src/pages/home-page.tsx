@@ -1,7 +1,7 @@
 import { lazy, startTransition, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import {
   CheckIcon,
   EyeIcon,
@@ -10,6 +10,7 @@ import {
   RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
+  TrophyIcon,
   UsersIcon,
   XIcon,
 } from 'lucide-react'
@@ -30,12 +31,23 @@ import {
 import type { Match } from '@/types'
 import { PredictionHistory } from '@/components/prediction-history'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { GlassSurface } from '@/components/ui/glass-surface'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
 
 const POOLER_BATCH_SIZE = 6
 const HIDE_CHARTS_STORAGE_KEY = 'pool-predict:hide-pooler-charts'
@@ -106,8 +118,8 @@ function RevealedPredictions({
   if (!ended) return null
 
   return (
-    <details className="rounded-lg border border-border px-3 py-2 text-xs">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-muted-foreground">
+    <details className="rounded-xl bg-muted/34 px-3 py-1.5 text-xs shadow-[0_0_0_1px_var(--separator)_inset]">
+      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-muted-foreground outline-none">
         <span className="flex items-center gap-1.5">
           <EyeIcon className="size-3.5" /> Revealed predictions
         </span>
@@ -144,6 +156,7 @@ type MatchCardProps = {
 }
 
 function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCharts }: MatchCardProps) {
+  const reducedMotion = useReducedMotion()
   const queryClient = useQueryClient()
   const [decision, setDecision] = useState<'validate' | 'not_validate' | null>(
     bet?.prediction ?? null
@@ -210,18 +223,19 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
     <>
       <motion.div
         layout
-        whileHover={disabled ? undefined : { y: -2 }}
-        className="relative z-0 transition-[z-index] hover:z-30 focus-within:z-30"
+        whileHover={disabled || reducedMotion ? undefined : { y: -3 }}
+        transition={{ type: 'spring', duration: 0.24, bounce: 0 }}
+        className="relative z-0 hover:z-30 focus-within:z-30"
       >
         <Card
           size="sm"
-          className="relative h-full overflow-visible transition-all duration-[0.4s] ease-in-out"
+          className="relative h-full overflow-visible"
         >
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="absolute top-2 right-2 z-10"
+            className="absolute top-3 right-3 z-10"
             aria-label={`Expand @${match.login} details`}
             onMouseEnter={prefetchPlayerDetails}
             onPointerDown={prefetchPlayerDetails}
@@ -235,7 +249,7 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
           </Button>
 
           <CardContent className="flex flex-col gap-4 pt-(--card-spacing)">
-            <div className="flex items-center gap-3 pr-8">
+            <div className="flex items-center gap-3 pr-11">
               <Avatar className="size-14 shrink-0 sm:size-16">
                 <AvatarImage
                   src={match.avatarUrl}
@@ -258,11 +272,7 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
               <Button
                 type="button"
                 size="sm"
-                variant={decision === 'validate' ? 'default' : 'outline'}
-                className={cn(
-                  decision === 'validate' &&
-                    'bg-emerald-600 text-white hover:bg-emerald-600/90 dark:bg-emerald-500'
-                )}
+                variant={decision === 'validate' ? 'success' : 'outline'}
                 onClick={saveValidate}
                 disabled={disabled}
                 aria-label={`Predict that @${match.login} validates`}
@@ -272,11 +282,7 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
               <Button
                 type="button"
                 size="sm"
-                variant={decision === 'not_validate' ? 'default' : 'outline'}
-                className={cn(
-                  decision === 'not_validate' &&
-                    'bg-red-600 text-white hover:bg-red-600/90 dark:bg-red-500'
-                )}
+                variant={decision === 'not_validate' ? 'destructive-solid' : 'outline'}
                 onClick={saveNotValidate}
                 disabled={disabled}
                 aria-label={`Predict that @${match.login} does not validate`}
@@ -286,7 +292,10 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
             </div>
 
             {decision === 'validate' && !exam.locked ? (
-              <form onSubmit={saveScore} className="flex flex-col gap-2 rounded-lg border p-3">
+              <form
+                onSubmit={saveScore}
+                className="flex flex-col gap-2 rounded-xl bg-muted/34 p-3 shadow-[0_0_0_1px_var(--separator)_inset]"
+              >
                 <Label htmlFor={`score-${exam.id}-${match.id}`} className="text-xs">
                   Optional exact score · 0–100 · +1 bonus
                 </Label>
@@ -299,7 +308,6 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
                     step={1}
                     value={score}
                     onChange={(event) => setScore(event.target.value)}
-                    className="h-8"
                     disabled={disabled}
                   />
                   <Button type="submit" size="sm" disabled={disabled || score === ''}>
@@ -327,8 +335,9 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
             ) : null}
 
             {bet ? (
-              <div className="flex items-center justify-between gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                <span>
+              <div className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-success/8 pl-3 text-xs text-success">
+                <span className="flex items-center gap-1.5">
+                  <CheckIcon className="size-3.5" />
                   Saved · {bet.prediction === 'validate'
                     ? validationPredictionLabel(bet.predictedScore)
                     : 'Not validate'}
@@ -356,7 +365,7 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
           </CardContent>
 
           {!hideCharts ? (
-            <CardFooter className="relative z-10 flex-col items-stretch overflow-visible">
+            <CardFooter className="relative z-10 mt-auto flex-col items-stretch overflow-hidden sm:overflow-visible">
               <Suspense fallback={<Skeleton className="h-36 w-full" />}>
                 <FridayLineChart fridays={match.fridays} login={match.login} />
               </Suspense>
@@ -382,9 +391,11 @@ function MatchCard({ match, poolId, campusId, exam, bet, sourceAvailable, hideCh
 
 export function HomePage() {
   const { user } = useAuth()
+  const reducedMotion = useReducedMotion()
   const [activeTab, setActiveTab] = useState<'poolers' | 'predictions'>('poolers')
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState<'login' | 'level-desc' | 'level-asc'>('level-desc')
+  const [memeOpen, setMemeOpen] = useState(false)
   const [visiblePoolerCount, setVisiblePoolerCount] = useState(POOLER_BATCH_SIZE)
   const [hideCharts, setHideCharts] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -547,97 +558,139 @@ export function HomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Hey, <span className="text-primary">@{user?.login}</span>
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Make at least one prediction before the exam locks or receive −2 points.
-          </p>
-        </div>
-        <Button asChild variant="secondary" className="w-full sm:w-auto">
-          <Link to="/leaderboard">View leaderboard</Link>
-        </Button>
-      </section>
-
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-8 sm:gap-12">
-          <p className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground">Your Rank</span>
-            <span className="font-display text-5xl leading-none text-blue-500 sm:text-6xl">
-              {user?.rank ? `#${user.rank}` : '—'}
-            </span>
-          </p>
-          <p className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground">Total score</span>
-            <span className="text-3xl font-semibold tabular-nums text-blue-500 sm:text-4xl">
-              {user?.totalScore.toLocaleString()}
-            </span>
-          </p>
-        </div>
-        <label
-          htmlFor="hide-pooler-charts"
-          className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
-        >
-          <input
-            id="hide-pooler-charts"
-            type="checkbox"
-            checked={hideCharts}
-            onChange={(event) => {
-              const next = event.target.checked
-              setHideCharts(next)
-              localStorage.setItem(HIDE_CHARTS_STORAGE_KEY, next ? '1' : '0')
-            }}
-            className="size-4 accent-primary"
-          />
-          Hide charts on all poolers
-        </label>
-      </section>
-
-      <div
-        role="tablist"
-        aria-label="Pool views"
-        className="flex w-fit items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
+    <motion.div
+      className="flex flex-col gap-7"
+      initial={reducedMotion ? false : 'hidden'}
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: {
+          transition: { staggerChildren: reducedMotion ? 0 : 0.07 },
+        },
+      }}
+    >
+      <motion.section
+        variants={{
+          hidden: { opacity: 0, y: 12, filter: 'blur(3px)' },
+          visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
+        }}
+        transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
       >
-        <Button
-          type="button"
-          role="tab"
-          size="sm"
-          variant={activeTab === 'poolers' ? 'default' : 'ghost'}
-          aria-selected={activeTab === 'poolers'}
-          onClick={() => setActiveTab('poolers')}
+        <GlassSurface
+          variant="standard"
+          className="grid gap-6 rounded-[2rem] p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6"
         >
-          <UsersIcon data-icon="inline-start" /> Poolers
-        </Button>
-        <Button
-          type="button"
-          role="tab"
-          size="sm"
-          variant={activeTab === 'predictions' ? 'default' : 'ghost'}
-          aria-selected={activeTab === 'predictions'}
-          onClick={() => setActiveTab('predictions')}
-        >
-          <ListChecksIcon data-icon="inline-start" /> My predictions
-        </Button>
-      </div>
+          <div>
+            <Badge variant="secondary" className="mb-3">
+              Current pool
+            </Badge>
+            <h1 className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
+              Hey, <span className="text-primary">@{user?.login}</span>
+            </h1>
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+              Make at least one prediction before the exam locks or receive −2 points.
+            </p>
+            <Button asChild variant="secondary" className="mt-4 w-full sm:w-auto">
+              <Link to="/leaderboard">
+                <TrophyIcon data-icon="inline-start" />
+                View leaderboard
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="min-w-28 rounded-2xl bg-primary/9 p-4">
+              <p className="text-xs text-muted-foreground">Your rank</p>
+              <p className="mt-1 text-3xl font-semibold tracking-[-0.045em] text-primary tabular-nums sm:text-4xl">
+                {user?.rank ? `#${user.rank}` : '—'}
+              </p>
+            </div>
+            <div className="min-w-28 rounded-2xl bg-muted/48 p-4">
+              <p className="text-xs text-muted-foreground">Total score</p>
+              <p className="mt-1 text-3xl font-semibold tracking-[-0.045em] tabular-nums sm:text-4xl">
+                {user?.totalScore.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <label
+            htmlFor="hide-pooler-charts"
+            className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-muted-foreground sm:col-span-2"
+          >
+            <input
+              id="hide-pooler-charts"
+              type="checkbox"
+              checked={hideCharts}
+              onChange={(event) => {
+                const next = event.target.checked
+                setHideCharts(next)
+                localStorage.setItem(HIDE_CHARTS_STORAGE_KEY, next ? '1' : '0')
+              }}
+              className="native-check"
+            />
+            Hide charts on pooler cards
+          </label>
+        </GlassSurface>
+      </motion.section>
+
+      <motion.div
+        variants={{
+          hidden: { opacity: 0, y: 10 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+      >
+        <SegmentedControl
+          id="home-pool-view"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          ariaLabel="Pool views"
+          items={[
+            {
+              value: 'poolers',
+              label: 'Poolers',
+              icon: UsersIcon,
+              controls: 'poolers-panel',
+            },
+            {
+              value: 'predictions',
+              label: 'My predictions',
+              icon: ListChecksIcon,
+              controls: 'my-predictions-home-panel',
+            },
+          ]}
+        />
+      </motion.div>
 
       {activeTab === 'poolers' ? (
-        <>
+        <motion.div
+          id="poolers-panel"
+          role="tabpanel"
+          className="flex flex-col gap-5"
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reducedMotion ? 0 : 0.2 }}
+        >
           {!pool.sourceAvailable ? (
-            <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+            <p className="rounded-2xl bg-warning/13 px-4 py-3 text-sm text-warning-foreground shadow-[0_0_0_1px_color-mix(in_oklch,var(--warning),transparent_68%)_inset] dark:text-warning">
               42 is temporarily unavailable. Existing bets and scores are safe, but new betting is paused.
             </p>
           ) : null}
 
-          <section className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <section className="flex flex-col gap-5">
+            <GlassSurface
+              variant="regular"
+              className="flex flex-col gap-3 rounded-[1.5rem] p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold tracking-tight">Poolers</h2>
-                <span className="text-xs text-muted-foreground">{filteredMatches.length} total</span>
+                <h2 className="text-base font-semibold tracking-[-0.015em]">Poolers</h2>
+                <Badge variant="secondary" className="tabular-nums">
+                  {filteredMatches.length}
+                </Badge>
                 {selectedExam ? (
-                  <span className="text-xs font-medium text-primary">Exam {selectedExam.code}</span>
+                  <Badge variant={selectedExam.locked ? 'secondary' : 'success'}>
+                    Exam {selectedExam.code}
+                  </Badge>
                 ) : null}
               </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -646,14 +699,22 @@ export function HomePage() {
                   id="pooler-sort"
                   value={sortBy}
                   onChange={(event) => {
-                    setSortBy(event.target.value as typeof sortBy)
+                    const nextSort = event.target.value
+                    if (nextSort === 'female-to-male' || nextSort === 'male-to-female') {
+                      setMemeOpen(true)
+                      return
+                    }
+
+                    setSortBy(nextSort as typeof sortBy)
                     setVisiblePoolerCount(POOLER_BATCH_SIZE)
                   }}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="native-select px-3 text-sm sm:w-56"
                 >
                   <option value="login">Login A–Z</option>
                   <option value="level-desc">Level high–low</option>
                   <option value="level-asc">Level low–high</option>
+                  <option value="female-to-male">Female → male</option>
+                  <option value="male-to-female">Male → female</option>
                 </select>
                 <div className="relative sm:w-64">
                   <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -665,11 +726,11 @@ export function HomePage() {
                       setVisiblePoolerCount(POOLER_BATCH_SIZE)
                     }}
                     placeholder="Search login or name…"
-                    className="h-9 pl-8"
+                    className="pl-8"
                   />
                 </div>
               </div>
-            </div>
+            </GlassSurface>
 
             {poolersQuery.isPending ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -678,12 +739,12 @@ export function HomePage() {
                 ))}
               </div>
             ) : poolersQuery.error ? (
-              <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+              <p className="rounded-[1.75rem] border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
                 Live pooler data is unavailable. New bets remain paused until 42 responds.
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {selectedExam
                     ? visibleMatches.map((match) => (
                         <MatchCard
@@ -701,7 +762,7 @@ export function HomePage() {
                 </div>
                 <div
                   ref={loadMoreRef}
-                  className="flex min-h-10 items-center justify-center text-xs text-muted-foreground"
+                  className="flex min-h-10 items-center justify-center text-xs text-muted-foreground tabular-nums"
                   aria-live="polite"
                 >
                   {hasMorePoolers
@@ -713,15 +774,59 @@ export function HomePage() {
               </>
             )}
           </section>
-        </>
+        </motion.div>
       ) : user ? (
-        <PredictionHistory
-          poolId={pool.id}
-          campusId={pool.campusId}
-          intraUserId={user.intraUserId}
-          initialData={initialPredictionHistory}
-        />
+        <motion.div
+          id="my-predictions-home-panel"
+          role="tabpanel"
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reducedMotion ? 0 : 0.2 }}
+        >
+          <PredictionHistory
+            poolId={pool.id}
+            campusId={pool.campusId}
+            intraUserId={user.intraUserId}
+            initialData={initialPredictionHistory}
+          />
+        </motion.div>
       ) : null}
-    </div>
+      <Dialog open={memeOpen} onOpenChange={setMemeOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nice try 😄</DialogTitle>
+            <DialogDescription>
+              That filter is just for laughs — your pooler order did not change.
+            </DialogDescription>
+          </DialogHeader>
+
+          <a
+            href="https://imgflip.com/i/aww7hf"
+            target="_blank"
+            rel="noreferrer"
+            className="overflow-hidden rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/35"
+          >
+            <img
+              src="https://i.imgflip.com/aww7hf.jpg"
+              alt="Tom meme saying “We don’t do that in here”"
+              className="media-outlined block h-auto w-full rounded-2xl object-cover"
+            />
+          </a>
+
+          <DialogFooter>
+            {/* <Button asChild variant="outline">
+              <a href="https://imgflip.com/memegenerator" target="_blank" rel="noreferrer">
+                Imgflip Meme Generator
+              </a>
+            </Button> */}
+            <DialogClose asChild>
+              <Button className="bg-transparent text-primary border border-primary hover:text-white hover:bg-primary/90">
+                Okay 🗿
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
   )
 }

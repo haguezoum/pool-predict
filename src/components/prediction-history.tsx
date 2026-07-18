@@ -113,7 +113,7 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
   }
 
   return (
-    <Card size="sm" className="hover:shadow-[var(--shadow-content-hover)]">
+    <Card size="sm">
       <CardContent className="flex flex-col gap-4 pt-(--card-spacing)">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">

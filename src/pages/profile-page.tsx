@@ -6,17 +6,20 @@ import {
   TargetIcon,
   TrophyIcon,
 } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassSurface } from '@/components/ui/glass-surface'
 import { Separator } from '@/components/ui/separator'
 
 export function ProfilePage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const reducedMotion = useReducedMotion()
   if (!user) return null
 
   const initials = user.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
@@ -32,14 +35,25 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Profile</h1>
-        <p className="text-sm text-muted-foreground">Live 42 identity and current-pool record.</p>
-      </section>
-
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <motion.div
+      className="flex flex-col gap-7"
+      initial={reducedMotion ? false : 'hidden'}
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } },
+      }}
+    >
+      <motion.section
+        variants={{
+          hidden: { opacity: 0, y: 10, filter: 'blur(3px)' },
+          visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
+        }}
+        transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
+      >
+      <GlassSurface variant="standard" className="rounded-[2rem] p-1">
+        <Card className="bg-transparent shadow-none">
+        <CardHeader className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="size-16 sm:size-20">
               <AvatarImage src={user.avatarUrl} alt={user.login} />
@@ -60,11 +74,20 @@ export function ProfilePage() {
             <LogOutIcon data-icon="inline-start" /> Log out
           </Button>
         </CardHeader>
-      </Card>
+        </Card>
+      </GlassSurface>
+      </motion.section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <motion.section
+        variants={{
+          hidden: { opacity: 0, y: 10 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      >
         {stats.map(({ label, value, icon: Icon }) => (
-          <Card key={label} size="sm">
+          <Card key={label} size="sm" className="hover:bg-card/96">
             <CardContent className="flex flex-col gap-2 pt-(--card-spacing)">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Icon className="size-3.5" /> <span className="text-xs">{label}</span>
@@ -73,8 +96,15 @@ export function ProfilePage() {
             </CardContent>
           </Card>
         ))}
-      </section>
+      </motion.section>
 
+      <motion.div
+        variants={{
+          hidden: { opacity: 0, y: 10 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+      >
       <Card>
         <CardHeader>
           <CardTitle>Current pool record</CardTitle>
@@ -83,7 +113,7 @@ export function ProfilePage() {
         <CardContent className="flex flex-col gap-4">
           <div className="grid grid-cols-3 gap-3 text-center sm:gap-6">
             <div className="flex flex-col gap-1">
-              <span className="text-2xl font-semibold tabular-nums text-emerald-600">{user.correct}</span>
+              <span className="text-2xl font-semibold tabular-nums text-success">{user.correct}</span>
               <span className="text-xs text-muted-foreground">Correct</span>
             </div>
             <div className="flex flex-col gap-1">
@@ -91,7 +121,7 @@ export function ProfilePage() {
               <span className="text-xs text-muted-foreground">Exact +3</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-2xl font-semibold tabular-nums text-red-500">{user.wrong}</span>
+              <span className="text-2xl font-semibold tabular-nums text-destructive">{user.wrong}</span>
               <span className="text-xs text-muted-foreground">Wrong</span>
             </div>
           </div>
@@ -100,14 +130,27 @@ export function ProfilePage() {
             <span className="text-muted-foreground">Settled predictions</span>
             <span className="font-medium tabular-nums">{user.predictions}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${user.accuracy}%` }} />
+          <div
+            className="h-2.5 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-label="Prediction accuracy"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={user.accuracy}
+          >
+            <motion.div
+              className="h-full rounded-full bg-primary"
+              initial={reducedMotion ? false : { width: 0 }}
+              animate={{ width: `${user.accuracy}%` }}
+              transition={{ duration: reducedMotion ? 0 : 0.3, ease: [0.2, 0, 0, 1] }}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Each exam with zero predictions adds one −2 event. Partial participation avoids it.
           </p>
         </CardContent>
       </Card>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }

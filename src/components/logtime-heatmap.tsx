@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils'
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
 
 const intensityClass: Record<LogtimeIntensity, string> = {
-  0: 'bg-blue-500/10',
-  1: 'bg-blue-400/35',
-  2: 'bg-blue-500/55',
-  3: 'bg-blue-600/80',
-  4: 'bg-blue-800',
+  0: 'bg-primary/8',
+  1: 'bg-primary/28',
+  2: 'bg-primary/48',
+  3: 'bg-primary/70',
+  4: 'bg-primary',
 }
 
 const intensityLabel: Record<LogtimeIntensity, string> = {
@@ -58,8 +58,10 @@ export function LogtimeHeatmap({ logtime, className }: LogtimeHeatmapProps) {
               <div
                 key={`${slot.time}-${dayIndex}`}
                 title={`${slot.time} · ${DAY_LABELS[dayIndex]}: ${intensityLabel[level]}`}
+                role="img"
+                aria-label={`${DAY_LABELS[dayIndex]} at ${slot.time}: ${intensityLabel[level]} activity`}
                 className={cn(
-                  'aspect-square w-full max-w-10 justify-self-center rounded-md sm:rounded-lg',
+                  'aspect-square w-full max-w-10 justify-self-center rounded-[0.45rem]',
                   intensityClass[level]
                 )}
               />
@@ -73,7 +75,7 @@ export function LogtimeHeatmap({ logtime, className }: LogtimeHeatmapProps) {
         {([0, 1, 2, 3, 4] as LogtimeIntensity[]).map((level) => (
           <span
             key={level}
-            className={cn('size-3 rounded-sm', intensityClass[level])}
+            className={cn('size-3 rounded-[0.22rem]', intensityClass[level])}
           />
         ))}
         <span>More</span>

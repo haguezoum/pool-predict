@@ -4,6 +4,8 @@ import { AuthProvider } from '@/context/auth-context'
 import { ThemeProvider } from '@/context/theme-context'
 import { AppShell } from '@/components/layout/app-shell'
 import { ProtectedRoute } from '@/components/layout/protected-route'
+import { GlassSurface } from '@/components/ui/glass-surface'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const HomePage = lazy(() => import('@/pages/home-page').then((module) => ({ default: module.HomePage })))
 const LeaderboardPage = lazy(() =>
@@ -19,8 +21,16 @@ const PlayerProfilePage = lazy(() =>
 
 function RouteFallback() {
   return (
-    <div className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">
-      Loading…
+    <div className="app-atmosphere grid min-h-svh place-items-center p-4">
+      <GlassSurface variant="regular" className="w-full max-w-sm rounded-3xl p-5">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-11 rounded-2xl" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-2.5 w-44 max-w-full" />
+          </div>
+        </div>
+      </GlassSurface>
     </div>
   )
 }
