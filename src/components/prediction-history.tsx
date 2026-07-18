@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckIcon, Clock3Icon, PencilIcon, Trash2Icon, XIcon } from 'lucide-react'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  Clock3Icon,
+  HistoryIcon,
+  ListChecksIcon,
+  PencilIcon,
+  Trash2Icon,
+  XIcon,
+} from 'lucide-react'
 import type {
   Prediction,
   PredictionHistoryEntryView,
@@ -106,7 +115,6 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
               <p className="truncate text-xs text-muted-foreground">{prediction.poolerDisplayName}</p>
             </div>
           </div>
-          <Badge variant="secondary">Exam {prediction.examCode}</Badge>
         </div>
 
         <div className="flex items-center justify-between gap-2">
@@ -205,7 +213,89 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
   )
 }
 
+function PredictionExamGroups({
+  predictions,
+  poolId,
+  campusId,
+  isViewer,
+  emptyMessage,
+}: {
+  predictions: PredictionHistoryEntryView[]
+  poolId: string
+  campusId: number
+  isViewer: boolean
+  emptyMessage: string
+}) {
+  const groups = Array.from(
+    predictions.reduce((byExam, prediction) => {
+      const examPredictions = byExam.get(prediction.examCode) ?? []
+      examPredictions.push(prediction)
+      byExam.set(prediction.examCode, examPredictions)
+      return byExam
+    }, new Map<PredictionHistoryEntryView['examCode'], PredictionHistoryEntryView[]>())
+  ).toSorted(([leftCode], [rightCode]) => leftCode.localeCompare(rightCode))
+
+  if (groups.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          {emptyMessage}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map(([examCode, examPredictions]) => {
+        const examEnded = examPredictions.every((prediction) => prediction.examEnded)
+        const predictionCount = examPredictions.length
+
+        return (
+          <details
+            key={examCode}
+            open
+            className="group overflow-hidden rounded-xl border bg-card shadow-xs"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+                  {examCode}
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-semibold tracking-tight">Exam {examCode}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {predictionCount} {predictionCount === 1 ? 'prediction' : 'predictions'}
+                  </span>
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <Badge variant="secondary">{examEnded ? 'Ended' : 'Open'}</Badge>
+                <ChevronDownIcon className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+              </span>
+            </summary>
+            <div className="grid grid-cols-1 gap-3 border-t bg-muted/15 p-3 sm:grid-cols-2 lg:grid-cols-3">
+              {examPredictions
+                .toSorted((left, right) => left.poolerLogin.localeCompare(right.poolerLogin))
+                .map((prediction) => (
+                  <PredictionCard
+                    key={prediction.id}
+                    poolId={poolId}
+                    campusId={campusId}
+                    prediction={prediction}
+                    editable={isViewer && !prediction.examEnded}
+                  />
+                ))}
+            </div>
+          </details>
+        )
+      })}
+    </div>
+  )
+}
+
 export function PredictionHistory({ poolId, campusId, intraUserId, initialData }: PredictionHistoryProps) {
+  const [activeView, setActiveView] = useState<'predictions' | 'history'>('predictions')
   const historyQuery = useQuery({
     queryKey: ['prediction-history', campusId, poolId, intraUserId],
     queryFn: () => api.predictionHistory(poolId, intraUserId, campusId),
@@ -239,9 +329,9 @@ export function PredictionHistory({ poolId, campusId, intraUserId, initialData }
   }
 
   const { user, isViewer } = historyQuery.data
-  const predictions = historyQuery.data.predictions.toSorted(
-    (left, right) => left.examCode.localeCompare(right.examCode) || left.poolerLogin.localeCompare(right.poolerLogin)
-  )
+  const predictions = historyQuery.data.predictions
+  const openPredictions = predictions.filter((prediction) => !prediction.examEnded)
+  const previousPredictions = predictions.filter((prediction) => prediction.examEnded)
 
   return (
     <section className="flex flex-col gap-4">
@@ -256,32 +346,79 @@ export function PredictionHistory({ poolId, campusId, intraUserId, initialData }
           </h2>
           <p className="text-sm text-muted-foreground">
             {isViewer
-              ? 'Your saved predictions across Exam 00–03.'
+              ? 'Review your open predictions or revisit previous exams.'
               : 'Only predictions from exams that have ended are visible.'}
           </p>
         </div>
       </div>
 
-      {predictions.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {isViewer
-              ? 'You have not made a prediction in this pool yet.'
-              : 'No completed-exam predictions are available for this player.'}
-          </CardContent>
-        </Card>
+      {isViewer ? (
+        <>
+          <div
+            role="tablist"
+            aria-label="My prediction views"
+            className="flex w-full items-center gap-1 rounded-lg border bg-muted/40 p-1 sm:w-fit"
+          >
+            <Button
+              type="button"
+              role="tab"
+              size="sm"
+              variant={activeView === 'predictions' ? 'default' : 'ghost'}
+              aria-selected={activeView === 'predictions'}
+              aria-controls="my-predictions-panel"
+              className="flex-1 sm:flex-none"
+              onClick={() => setActiveView('predictions')}
+            >
+              <ListChecksIcon data-icon="inline-start" />
+              My predictions
+              <span className="tabular-nums opacity-70">{openPredictions.length}</span>
+            </Button>
+            <Button
+              type="button"
+              role="tab"
+              size="sm"
+              variant={activeView === 'history' ? 'default' : 'ghost'}
+              aria-selected={activeView === 'history'}
+              aria-controls="prediction-history-panel"
+              className="flex-1 sm:flex-none"
+              onClick={() => setActiveView('history')}
+            >
+              <HistoryIcon data-icon="inline-start" />
+              History
+              <span className="tabular-nums opacity-70">{previousPredictions.length}</span>
+            </Button>
+          </div>
+
+          {activeView === 'predictions' ? (
+            <div id="my-predictions-panel" role="tabpanel">
+              <PredictionExamGroups
+                predictions={openPredictions}
+                poolId={poolId}
+                campusId={campusId}
+                isViewer
+                emptyMessage="You do not have any predictions for an open exam."
+              />
+            </div>
+          ) : (
+            <div id="prediction-history-panel" role="tabpanel">
+              <PredictionExamGroups
+                predictions={previousPredictions}
+                poolId={poolId}
+                campusId={campusId}
+                isViewer
+                emptyMessage="Your prediction history is empty."
+              />
+            </div>
+          )}
+        </>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {predictions.map((prediction) => (
-            <PredictionCard
-              key={prediction.id}
-              poolId={poolId}
-              campusId={campusId}
-              prediction={prediction}
-              editable={isViewer && !prediction.examEnded}
-            />
-          ))}
-        </div>
+        <PredictionExamGroups
+          predictions={previousPredictions}
+          poolId={poolId}
+          campusId={campusId}
+          isViewer={false}
+          emptyMessage="No completed-exam predictions are available for this player."
+        />
       )}
     </section>
   )
