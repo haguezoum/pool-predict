@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BetInput } from '../shared/contracts.js'
 import { createApp } from './app.js'
 import type { Env } from './env.js'
-import type { FortyTwoClient } from './services/forty-two.js'
+import { FortyTwoUnavailableError, type FortyTwoClient } from './services/forty-two.js'
 import type { LivePoolSnapshot } from './services/forty-two.js'
 import type { Repository } from './services/repository.js'
 
@@ -432,12 +432,11 @@ describe('Express API boundary', () => {
         { bet_id: 'bet-0', type: 'correct' },
       ]),
     } as unknown as Repository
-    const fortyTwo = {
-      getUsers: vi.fn().mockResolvedValue([
+    const getUsers = vi.fn().mockResolvedValue([
         { id: 8, login: 'player', displayname: 'Player User' },
         { id: 42, login: 'pooler', displayname: 'Pooler User' },
-      ]),
-    } as unknown as FortyTwoClient
+      ])
+    const fortyTwo = { getUsers } as unknown as FortyTwoClient
     const app = createApp({ env, repository, fortyTwo })
     const { client } = await localRequest(app)
 
@@ -458,6 +457,9 @@ describe('Express API boundary', () => {
     })
 
     getSession.mockResolvedValue({ user: target })
+    getUsers.mockRejectedValueOnce(
+      new FortyTwoUnavailableError('42 is unavailable')
+    )
     const ownResponse = await client
       .get('/api/pools/pool-id/users/8/predictions')
       .set('Cookie', 'pool_predict_session=session-token')

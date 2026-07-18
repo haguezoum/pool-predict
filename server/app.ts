@@ -502,7 +502,10 @@ export function createApp(overrides: Partial<Dependencies> = {}) {
         return Boolean(exam && (isViewer || examHasEnded(exam, now)))
       })
       const profileIds = [intraUserId, ...rows.map((row) => row.poolerIntraId)]
-      const profiles = await fortyTwo.getUsers(profileIds)
+      const profiles = await fortyTwo.getUsers(profileIds).catch((error: unknown) => {
+        if (error instanceof FortyTwoUnavailableError) return []
+        throw error
+      })
       const profileById = new Map(profiles.map((profile) => [profile.id, toPublicUser(profile)]))
       const targetProfile = profileById.get(intraUserId)
 

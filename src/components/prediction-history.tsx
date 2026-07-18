@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -20,7 +21,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { GlassSurface } from '@/components/ui/glass-surface'
 import { Input } from '@/components/ui/input'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
@@ -59,6 +62,7 @@ type PredictionCardProps = {
 
 function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCardProps) {
   const queryClient = useQueryClient()
+  const reducedMotion = useReducedMotion()
   const [editing, setEditing] = useState(false)
   const [decision, setDecision] = useState<Prediction>(prediction.prediction)
   const [score, setScore] = useState(prediction.predictedScore?.toString() ?? '')
@@ -109,7 +113,7 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
   }
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="hover:shadow-[var(--shadow-content-hover)]">
       <CardContent className="flex flex-col gap-4 pt-(--card-spacing)">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -127,11 +131,11 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
         {prediction.examEnded ? (
           <div
             className={cn(
-              'grid grid-cols-2 gap-3 rounded-lg border p-3',
+              'grid grid-cols-2 gap-3 rounded-xl bg-muted/26 p-3 shadow-[0_0_0_1px_var(--separator)_inset]',
               prediction.outcome === 'wrong' &&
-                'border-red-500/35 bg-red-500/5',
+                'bg-destructive/7 shadow-[0_0_0_1px_color-mix(in_oklch,var(--destructive),transparent_68%)_inset]',
               (prediction.outcome === 'correct' || prediction.outcome === 'exact') &&
-                'border-emerald-500/35 bg-emerald-500/5'
+                'bg-success/7 shadow-[0_0_0_1px_color-mix(in_oklch,var(--success),transparent_68%)_inset]'
             )}
           >
             <div className="min-w-0">
@@ -142,19 +146,19 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
                 {prediction.prediction === 'validate' ? (
                   <>
                     <CheckIcon className="size-4 shrink-0" />
-                    <span className="truncate">
+                    <span>
                       {validationPredictionLabel(prediction.predictedScore)}
                     </span>
                   </>
                 ) : (
                   <>
                     <XIcon className="size-4 shrink-0" />
-                    <span className="truncate">Not validate</span>
+                    <span>Not validate</span>
                   </>
                 )}
               </p>
             </div>
-            <div className="min-w-0 border-l pl-3">
+            <div className="min-w-0 border-l border-[var(--separator)] pl-3">
               <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
                 Actual result
               </p>
@@ -166,17 +170,17 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
                 ) : (
                   <Clock3Icon className="size-4 shrink-0" />
                 )}
-                <span className="truncate">
+                <span>
                   {actualResultLabel(prediction.actualValidated, prediction.actualScore)}
                 </span>
               </p>
             </div>
             <p
               className={cn(
-                'col-span-2 flex items-center gap-1.5 border-t pt-2 text-xs font-semibold',
-                prediction.outcome === 'wrong' && 'text-red-600 dark:text-red-400',
+                'col-span-2 flex items-center gap-1.5 border-t border-[var(--separator)] pt-2 text-xs font-semibold',
+                prediction.outcome === 'wrong' && 'text-destructive',
                 (prediction.outcome === 'correct' || prediction.outcome === 'exact') &&
-                  'text-emerald-600 dark:text-emerald-400',
+                  'text-success',
                 prediction.outcome === null && 'text-muted-foreground'
               )}
             >
@@ -192,33 +196,32 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
             </p>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-muted/30 px-3">
             <p className="flex items-center gap-1.5 text-sm font-semibold">
               {prediction.prediction === 'validate' ? (
                 <>
-                  <CheckIcon className="size-4 text-emerald-600" />
+                  <CheckIcon className="size-4 text-success" />
                   {validationPredictionLabel(prediction.predictedScore)}
                 </>
               ) : (
-                <><XIcon className="size-4 text-red-500" /> Not validate</>
+                <><XIcon className="size-4 text-destructive" /> Not validate</>
               )}
             </p>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock3Icon className="size-3.5" /> Open
-            </span>
+            <Badge variant="success">
+              <Clock3Icon data-icon="inline-start" /> Open
+            </Badge>
           </div>
         )}
 
         {editable && !editing ? (
-          <div className="grid grid-cols-2 gap-2 border-t pt-3">
+          <div className="grid grid-cols-2 gap-2 border-t border-[var(--separator)] pt-3">
             <Button type="button" size="sm" variant="outline" onClick={beginEditing}>
               <PencilIcon data-icon="inline-start" /> Change
             </Button>
             <Button
               type="button"
               size="sm"
-              variant="outline"
-              className="text-destructive hover:text-destructive"
+              variant="destructive"
               onClick={() => deleteMutation.mutate()}
               disabled={deleteMutation.isPending}
             >
@@ -228,13 +231,24 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
           </div>
         ) : null}
 
-        {editable && editing ? (
-          <div className="flex flex-col gap-3 rounded-lg border p-3">
+        <AnimatePresence initial={false}>
+          {editable && editing ? (
+            <motion.div
+            initial={reducedMotion ? false : { opacity: 0, y: 8, filter: 'blur(2px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: -6, filter: 'blur(2px)' }
+            }
+            transition={{ duration: reducedMotion ? 0 : 0.18, ease: [0.2, 0, 0, 1] }}
+            className="flex flex-col gap-3 rounded-xl bg-muted/34 p-3 shadow-[0_0_0_1px_var(--separator)_inset]"
+          >
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
                 size="sm"
-                variant={decision === 'validate' ? 'default' : 'outline'}
+                variant={decision === 'validate' ? 'success' : 'outline'}
                 onClick={() => setDecision('validate')}
               >
                 Validate
@@ -242,7 +256,7 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
               <Button
                 type="button"
                 size="sm"
-                variant={decision === 'not_validate' ? 'default' : 'outline'}
+                variant={decision === 'not_validate' ? 'destructive-solid' : 'outline'}
                 onClick={() => {
                   setDecision('not_validate')
                   setScore('')
@@ -281,8 +295,9 @@ function PredictionCard({ poolId, campusId, prediction, editable }: PredictionCa
                 Close
               </Button>
             </div>
-          </div>
-        ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
         {mutationError ? <p className="text-xs text-destructive">{mutationError}</p> : null}
       </CardContent>
     </Card>
@@ -313,7 +328,7 @@ function PredictionExamGroups({
 
   if (groups.length === 0) {
     return (
-      <Card>
+      <Card className="bg-card/72">
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
           {emptyMessage}
         </CardContent>
@@ -331,26 +346,28 @@ function PredictionExamGroups({
           <details
             key={examCode}
             open
-            className="group overflow-hidden rounded-xl border bg-card shadow-xs"
+            className="group overflow-hidden rounded-[1.75rem] bg-card shadow-[var(--shadow-content)]"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 outline-none transition-[background-color] duration-160 hover:bg-muted/42 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
               <span className="flex min-w-0 items-center gap-3">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
                   {examCode}
                 </span>
                 <span className="flex min-w-0 flex-col">
                   <span className="font-semibold tracking-tight">Exam {examCode}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground tabular-nums">
                     {predictionCount} {predictionCount === 1 ? 'prediction' : 'predictions'}
                   </span>
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
-                <Badge variant="secondary">{examEnded ? 'Ended' : 'Open'}</Badge>
+                <Badge variant={examEnded ? 'secondary' : 'success'}>
+                  {examEnded ? 'Ended' : 'Open'}
+                </Badge>
                 <ChevronDownIcon className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
               </span>
             </summary>
-            <div className="grid grid-cols-1 gap-3 border-t bg-muted/15 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 border-t border-[var(--separator)] bg-muted/18 p-3 sm:grid-cols-2 xl:grid-cols-3">
               {examPredictions
                 .toSorted((left, right) => left.poolerLogin.localeCompare(right.poolerLogin))
                 .map((prediction) => (
@@ -375,7 +392,8 @@ export function PredictionHistory({ poolId, campusId, intraUserId, initialData }
   const historyQuery = useQuery({
     queryKey: ['prediction-history', campusId, poolId, intraUserId],
     queryFn: () => api.predictionHistory(poolId, intraUserId, campusId),
-    initialData,
+    placeholderData: initialData,
+    refetchOnMount: 'always',
     staleTime: 5 * 60_000,
   })
 
@@ -410,8 +428,8 @@ export function PredictionHistory({ poolId, campusId, intraUserId, initialData }
   const previousPredictions = predictions.filter((prediction) => prediction.examEnded)
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+    <section className="flex flex-col gap-5">
+      <GlassSurface variant="standard" className="flex items-center gap-3 rounded-[1.5rem] p-4">
         <Avatar className="size-12">
           <AvatarImage src={user.avatarUrl} alt={user.login} />
           <AvatarFallback>{initials(user.displayName)}</AvatarFallback>
@@ -426,44 +444,32 @@ export function PredictionHistory({ poolId, campusId, intraUserId, initialData }
               : 'Only predictions from exams that have ended are visible.'}
           </p>
         </div>
-      </div>
+      </GlassSurface>
 
       {isViewer ? (
         <>
-          <div
-            role="tablist"
-            aria-label="My prediction views"
-            className="flex w-full items-center gap-1 rounded-lg border bg-muted/40 p-1 sm:w-fit"
-          >
-            <Button
-              type="button"
-              role="tab"
-              size="sm"
-              variant={activeView === 'predictions' ? 'default' : 'ghost'}
-              aria-selected={activeView === 'predictions'}
-              aria-controls="my-predictions-panel"
-              className="flex-1 sm:flex-none"
-              onClick={() => setActiveView('predictions')}
-            >
-              <ListChecksIcon data-icon="inline-start" />
-              My predictions
-              <span className="tabular-nums opacity-70">{openPredictions.length}</span>
-            </Button>
-            <Button
-              type="button"
-              role="tab"
-              size="sm"
-              variant={activeView === 'history' ? 'default' : 'ghost'}
-              aria-selected={activeView === 'history'}
-              aria-controls="prediction-history-panel"
-              className="flex-1 sm:flex-none"
-              onClick={() => setActiveView('history')}
-            >
-              <HistoryIcon data-icon="inline-start" />
-              History
-              <span className="tabular-nums opacity-70">{previousPredictions.length}</span>
-            </Button>
-          </div>
+          <SegmentedControl
+            id="prediction-history-view"
+            value={activeView}
+            onValueChange={setActiveView}
+            ariaLabel="My prediction views"
+            items={[
+              {
+                value: 'predictions',
+                label: 'My predictions',
+                icon: ListChecksIcon,
+                count: openPredictions.length,
+                controls: 'my-predictions-panel',
+              },
+              {
+                value: 'history',
+                label: 'History',
+                icon: HistoryIcon,
+                count: previousPredictions.length,
+                controls: 'prediction-history-panel',
+              },
+            ]}
+          />
 
           {activeView === 'predictions' ? (
             <div id="my-predictions-panel" role="tabpanel">
