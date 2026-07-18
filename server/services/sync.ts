@@ -27,13 +27,14 @@ export async function settlePool(
   if (!leaseUntil) return
 
   try {
+    const now = new Date()
     await repository.applyNoBetPenalties(synced.pool.id, synced.snapshot.campusId)
     const bets = await repository.listPoolBets(synced.pool.id, synced.snapshot.campusId)
     const examById = new Map(synced.exams.map((exam) => [exam.id, exam]))
     const liveExamByCode = new Map(synced.snapshot.exams.map((exam) => [exam.code, exam]))
     const resultsByExam = new Map<ExamCode, Awaited<ReturnType<FortyTwoClient['getExamResults']>>>()
 
-    const lockedExams = synced.exams.filter((exam) => exam.lockAt <= new Date())
+    const lockedExams = synced.exams.filter((exam) => exam.lockAt <= now)
     await Promise.all(
       lockedExams.map(async (exam) => {
         const liveExam = liveExamByCode.get(exam.code)
@@ -47,8 +48,12 @@ export async function settlePool(
 
     for (const bet of bets) {
       const exam = examById.get(bet.examId)
-      if (!exam || exam.lockAt > new Date()) continue
-      const result = resultsByExam.get(exam.code)?.get(bet.poolerIntraId) ?? null
+      if (!exam || exam.lockAt > now) continue
+      const publishedResult = resultsByExam.get(exam.code)?.get(bet.poolerIntraId)
+      const examEnded = now >= (exam.endsAt ?? exam.lockAt)
+      const result =
+        publishedResult ??
+        (examEnded ? { validated: false, score: null } : null)
       const outcome = result
         ? scoreBet(bet.prediction, bet.predictedScore, result)
         : null
