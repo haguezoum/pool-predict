@@ -6,12 +6,13 @@ import { AppShell } from '@/components/layout/app-shell'
 import { ProtectedRoute } from '@/components/layout/protected-route'
 import { GlassSurface } from '@/components/ui/glass-surface'
 import { Skeleton } from '@/components/ui/skeleton'
+// Eager: login must paint the seized banner immediately (no Suspense skeleton first).
+import { LoginPage } from '@/pages/login-page'
 
 const HomePage = lazy(() => import('@/pages/home-page').then((module) => ({ default: module.HomePage })))
 const LeaderboardPage = lazy(() =>
   import('@/pages/leaderboard-page').then((module) => ({ default: module.LeaderboardPage }))
 )
-const LoginPage = lazy(() => import('@/pages/login-page').then((module) => ({ default: module.LoginPage })))
 const ProfilePage = lazy(() =>
   import('@/pages/profile-page').then((module) => ({ default: module.ProfilePage }))
 )
@@ -42,6 +43,7 @@ export default function App() {
         <BrowserRouter>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
+              {/* Login is eager so the seized banner is never blocked by RouteFallback */}
               <Route path="/login" element={<LoginPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>

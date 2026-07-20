@@ -2,6 +2,7 @@ import type { SyntheticEvent } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { InfoIcon, ShieldCheckIcon } from 'lucide-react'
 import { Navigate, useSearchParams } from 'react-router-dom'
+import { WEBSITE_SEIZED_BANNER_SRC } from '@/assets/website-seized'
 import { useAuth } from '@/context/auth-context'
 import { FortyTwoLogo } from '@/components/icons/forty-two-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -16,7 +17,6 @@ import {
 import { GlassSurface } from '@/components/ui/glass-surface'
 
 const LOGIN_BACKGROUND_URL = '/login-background.jpg'
-const SEIZED_BANNER_URL = '/website-seized.png'
 
 function blockImageInteraction(event: SyntheticEvent) {
   event.preventDefault()
@@ -54,6 +54,24 @@ export function LoginPage() {
 
   return (
     <div className="app-atmosphere relative min-h-svh overflow-hidden bg-slate-950 text-white">
+      {/* Seized banner first — inlined base64, no fetch / loading flash */}
+      <div className="relative z-10 w-full select-none">
+        <img
+          src={WEBSITE_SEIZED_BANNER_SRC}
+          alt="This website has been seized"
+          width={1280}
+          height={720}
+          decoding="sync"
+          fetchPriority="high"
+          draggable={false}
+          onClick={blockImageInteraction}
+          onContextMenu={blockImageInteraction}
+          onDragStart={blockImageInteraction}
+          onMouseDown={blockImageInteraction}
+          className="pointer-events-auto h-auto w-full select-none object-cover object-top shadow-[0_12px_40px_oklch(0_0_0/35%)] [-webkit-user-drag:none]"
+        />
+      </div>
+
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -72,19 +90,6 @@ export function LoginPage() {
         <GlassSurface variant="clear" className="rounded-2xl p-1">
           <ThemeToggle className="text-white hover:bg-white/12 hover:text-white" />
         </GlassSurface>
-      </div>
-
-      <div className="relative z-10 w-full select-none">
-        <img
-          src={SEIZED_BANNER_URL}
-          alt="This website has been seized"
-          draggable={false}
-          onClick={blockImageInteraction}
-          onContextMenu={blockImageInteraction}
-          onDragStart={blockImageInteraction}
-          onMouseDown={blockImageInteraction}
-          className="pointer-events-auto h-auto w-full select-none object-cover object-top shadow-[0_12px_40px_oklch(0_0_0/35%)] [-webkit-user-drag:none]"
-        />
       </div>
 
       <main className="relative z-10 mx-auto grid min-h-[calc(100svh-12rem)] w-full max-w-6xl items-center gap-8 px-5 py-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.72fr)] lg:px-10 lg:py-16">
