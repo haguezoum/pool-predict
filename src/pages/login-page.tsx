@@ -1,3 +1,4 @@
+import type { SyntheticEvent } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { InfoIcon, ShieldCheckIcon } from 'lucide-react'
 import { Navigate, useSearchParams } from 'react-router-dom'
@@ -15,6 +16,12 @@ import {
 import { GlassSurface } from '@/components/ui/glass-surface'
 
 const LOGIN_BACKGROUND_URL = '/login-background.jpg'
+const SEIZED_BANNER_URL = '/website-seized.png'
+
+function blockImageInteraction(event: SyntheticEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+}
 
 export function LoginPage() {
   const { isAuthenticated, isLoading, loginWith42 } = useAuth()
@@ -67,7 +74,20 @@ export function LoginPage() {
         </GlassSurface>
       </div>
 
-      <main className="relative z-10 mx-auto grid min-h-svh w-full max-w-6xl items-center gap-8 px-5 py-20 lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.72fr)] lg:px-10">
+      <div className="relative z-10 w-full select-none">
+        <img
+          src={SEIZED_BANNER_URL}
+          alt="This website has been seized"
+          draggable={false}
+          onClick={blockImageInteraction}
+          onContextMenu={blockImageInteraction}
+          onDragStart={blockImageInteraction}
+          onMouseDown={blockImageInteraction}
+          className="pointer-events-auto h-auto w-full select-none object-cover object-top shadow-[0_12px_40px_oklch(0_0_0/35%)] [-webkit-user-drag:none]"
+        />
+      </div>
+
+      <main className="relative z-10 mx-auto grid min-h-[calc(100svh-12rem)] w-full max-w-6xl items-center gap-8 px-5 py-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.72fr)] lg:px-10 lg:py-16">
         <motion.section
           {...enter}
           transition={{ duration: reducedMotion ? 0 : 0.28, ease: [0.2, 0, 0, 1] }}
