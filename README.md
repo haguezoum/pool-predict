@@ -1,10 +1,10 @@
-# 1337 Pool Predict
+# Pool Predict
 
 <!-- image -->
 
 <img src="https://pool-predict.vercel.app/wa-validi.webp" alt="wa validiiii" width="400" align="center">
 
-Private Exam 00–03 prediction platform for the 1337 Piscine. The 42 API user kinds `admin`, `student`, and `external` may sign in by default, while current poolers remain rejected unless explicitly enabled (see .env.examle file) ; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
+Private Exam 00–03 prediction platform for the Piscine. The 42 API user kinds `admin`, `student`, and `external` may sign in by default, while current poolers remain rejected unless explicitly enabled (see .env.examle file) ; these access categories can be configured through server-only environment variables. The React application and the Express API deploy together on Vercel; Supabase is PostgreSQL storage only.
 
 ## Rules
 
@@ -64,13 +64,13 @@ SESSION_SECRET
 CRON_SECRET
 ```
 
-`FORTY_TWO_TETOUAN_CAMPUS_ID` defaults to the verified 1337 MED/Tetouan campus ID `55`. It can be overridden if 42 changes that reference.
+`FORTY_TWO_TETOUAN_CAMPUS_ID` defaults to the verified MED/Tetouan campus ID `55`. It can be overridden if 42 changes that reference.
 
 Access policy values are server-only and comma-separated where applicable:
 
 - `FORTY_TWO_ALLOWED_KINDS` accepts the 42 API `kind` values `admin`, `student`, and `external`. All three are enabled by default. Alumni and staff flags do not redefine the API kind.
 - `FORTY_TWO_ALLOW_POOLERS` accepts `yes`/`no`, `true`/`false`, or `1`/`0`. The default is `no`.
-- `FORTY_TWO_ALLOWED_CAMPUS_IDS` accepts additional numeric primary-campus IDs. Known 1337 campuses include Khouribga `16`, Benguerir `21`, Tetouan/MED `55`, and Rabat `75`. The default campus configured by `FORTY_TWO_TETOUAN_CAMPUS_ID` is always included.
+- `FORTY_TWO_ALLOWED_CAMPUS_IDS` accepts additional numeric primary-campus IDs. Known campuses include Khouribga `16`, Benguerir `21`, Tetouan/MED `55`, and Rabat `75`. The default campus configured by `FORTY_TWO_TETOUAN_CAMPUS_ID` is always included.
 
 Each authenticated student is bound to their primary 42 campus. Pool discovery, the five-minute 42 cache, poolers, bets, prediction history, score events, and leaderboard queries are partitioned by that `campus_id`. A student can only bet on poolers returned by the same-campus Piscine roster. Composite PostgreSQL foreign keys enforce the same boundary for stored writes, so adding an allowed campus cannot mix it into another campus leaderboard.
 

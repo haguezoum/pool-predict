@@ -778,6 +778,6 @@ export function toPublicUser(user: FortyTwoUser) {
     campusId: campusId ?? 0,
     campus: user.campus?.find((campus) =>
       user.campus_users?.some((entry) => entry.is_primary && entry.campus_id === campus.id)
-    )?.name ?? '1337 MED',
+    )?.name ?? 'MED',
   }
 }

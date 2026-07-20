@@ -215,7 +215,7 @@ export function AppShell() {
   })
   const pageTitle =
     pageTitles[location.pathname] ??
-    (location.pathname.startsWith('/profile/') ? 'Player profile' : '1337X Bet')
+    (location.pathname.startsWith('/profile/') ? 'Player profile' : 'Pool X Bet')
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -266,7 +266,7 @@ export function AppShell() {
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-[0.8125rem] font-semibold tracking-[-0.01em]">
-                    1337X Bet
+                    Pool X Bet
                   </span>
                   <span className="block truncate text-[0.6875rem] text-[var(--sidebar-label)]">
                     Pool predictor
@@ -311,7 +311,7 @@ export function AppShell() {
             <UserMenu compact={sidebarCollapsed} />
             {!sidebarCollapsed ? (
               <p className="px-3 pb-1 text-[0.65rem] text-[var(--sidebar-label-muted)]">
-                1337 Pool · 42 Network
+                Pool X Bet · 42 Network
               </p>
             ) : null}
           </div>

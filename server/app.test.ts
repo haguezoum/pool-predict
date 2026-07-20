@@ -118,7 +118,7 @@ describe('Express API boundary', () => {
         login: 'tester',
         displayname: 'Test User',
         kind: 'student',
-        campus: [{ id: 55, name: '1337 MED' }],
+        campus: [{ id: 55, name: 'MED' }],
         campus_users: [{ campus_id: 55, is_primary: true }],
       }),
       getCurrentPool: vi.fn(),

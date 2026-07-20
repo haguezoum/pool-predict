@@ -76,7 +76,7 @@ export function LoginPage() {
           <div className="flex items-end gap-3">
             <img
               src="/wa-validi.webp"
-              alt="1337 Pool"
+              alt="Pool"
               className="h-28 w-auto object-contain sm:h-36"
             />
             <div className="pb-3">
@@ -84,7 +84,7 @@ export function LoginPage() {
                 42 Network · Tetouan
               </p>
               <p className="mt-1 text-xl font-semibold tracking-[-0.025em] sm:text-2xl">
-                1337X Bet
+                Pool X Bet
               </p>
             </div>
           </div>

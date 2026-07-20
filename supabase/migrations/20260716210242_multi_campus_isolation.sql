@@ -7,7 +7,7 @@ alter table pool_predict.bets add column campus_id integer;
 alter table pool_predict.score_events add column campus_id integer;
 alter table pool_predict.leaderboard_totals add column campus_id integer;
 
--- All data created before multi-campus support belongs to 1337 MED (campus 55).
+-- All data created before multi-campus support belongs to  MED (campus 55).
 update pool_predict.app_users set campus_id = 55 where campus_id is null;
 update pool_predict.sessions set campus_id = 55 where campus_id is null;
 update pool_predict.pool_refs set campus_id = 55 where campus_id is null;
