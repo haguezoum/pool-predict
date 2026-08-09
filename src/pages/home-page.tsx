@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'motion/react'
 import {
   CheckIcon,
-  EyeIcon,
   ListChecksIcon,
   Maximize2Icon,
   RefreshCwIcon,
@@ -12,14 +11,12 @@ import {
   Trash2Icon,
   TrophyIcon,
   UsersIcon,
-  XIcon,
 } from 'lucide-react'
 import type {
   BetInput,
   BetView,
   ExamView,
   PredictionHistoryView,
-  RevealedBetView,
 } from '@shared/contracts'
 import { useAuth } from '@/context/auth-context'
 import {
@@ -98,53 +95,6 @@ function predictionOutcome(
     return 'exact'
   }
   return 'correct'
-}
-
-function RevealedPredictions({
-  exam,
-  poolerIntraId,
-  campusId,
-}: {
-  exam: ExamView
-  poolerIntraId: number
-  campusId: number
-}) {
-  const ended = examHasEnded(exam)
-  const query = useQuery({
-    queryKey: ['revealed-bets', campusId, exam.id],
-    queryFn: () => api.revealedBets(exam.id, campusId),
-    enabled: ended,
-    staleTime: 60_000,
-  })
-  const rows = (query.data ?? []).filter((bet) => bet.poolerIntraId === poolerIntraId)
-  if (!ended) return null
-
-  return (
-    <details className="rounded-xl bg-muted/34 px-3 py-1.5 text-xs shadow-[0_0_0_1px_var(--separator)_inset]">
-      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-muted-foreground outline-none">
-        <span className="flex items-center gap-1.5">
-          <EyeIcon className="size-3.5" /> Revealed predictions
-        </span>
-        <span className="tabular-nums">{query.isPending ? '…' : rows.length}</span>
-      </summary>
-      <div className="mt-2 flex max-h-28 flex-col gap-1.5 overflow-y-auto">
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground">No predictions for this pooler.</p>
-        ) : (
-          rows.map((bet: RevealedBetView) => (
-            <p key={bet.id} className="flex items-center justify-between gap-2">
-              <span>@{bet.bettorLogin}</span>
-              <span className="font-medium">
-                {bet.prediction === 'validate'
-                  ? validationPredictionLabel(bet.predictedScore)
-                  : 'Not validate'}
-              </span>
-            </p>
-          ))
-        )}
-      </div>
-    </details>
-  )
 }
 
 type MatchCardProps = {
@@ -270,19 +220,6 @@ function MatchCard({
     })
   }
 
-  function saveNotValidate() {
-    setDecision('not_validate')
-    setScore('')
-    mutation.mutate({ prediction: 'not_validate', predictedScore: null })
-  }
-
-  function saveValidate() {
-    if (decision === 'validate') return
-    setDecision('validate')
-    setScore('')
-    mutation.mutate({ prediction: 'validate', predictedScore: null })
-  }
-
   function saveScore(event: React.FormEvent) {
     event.preventDefault()
     const parsed = Number(score)
@@ -342,29 +279,6 @@ function MatchCard({
                   Lvl {match.level?.toFixed(2) ?? '—'}
                 </p>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={decision === 'validate' ? 'success' : 'outline'}
-                onClick={saveValidate}
-                disabled={disabled}
-                aria-label={`Predict that @${match.login} validates`}
-              >
-                <CheckIcon data-icon="inline-start" /> Validate
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={decision === 'not_validate' ? 'destructive-solid' : 'outline'}
-                onClick={saveNotValidate}
-                disabled={disabled}
-                aria-label={`Predict that @${match.login} does not validate`}
-              >
-                <XIcon data-icon="inline-start" /> Not validate
-              </Button>
             </div>
 
             {decision === 'validate' && !exam.locked ? (
@@ -433,11 +347,6 @@ function MatchCard({
               </div>
             ) : null}
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
-            <RevealedPredictions
-              exam={exam}
-              poolerIntraId={match.intraUserId}
-              campusId={campusId}
-            />
           </CardContent>
 
           {!hideCharts ? (
